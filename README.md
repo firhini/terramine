@@ -34,7 +34,7 @@ auf GitHub Pages, ohne Server und ohne Account.
 **Variante B — mit Actions**
 
 *Source* auf **GitHub Actions** stellen. Der Workflow `.github/workflows/pages.yml` veröffentlicht
-dann bei jedem Push auf `main` (und manuell über *Run workflow*).
+dann bei jedem Push auf `main` oder `claude/terramine-mine-tracker-mdxdex` (und manuell über *Run workflow*).
 
 **Auf dem Handy**: Seite öffnen → *Zum Startbildschirm hinzufügen*. Die App-Hülle wird per Service
 Worker gecacht und startet auch bei schlechtem Empfang; die Minen-Daten kommen weiter live aus dem Netz.
