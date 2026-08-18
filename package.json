@@ -1,0 +1,11 @@
+{
+  "name": "terramine-owner-radar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Statischer Check-in-Planer fuer TerraMine: naechste Mine eines Owners ohne Check-in in den letzten 24 h.",
+  "scripts": {
+    "test": "node --test tests/run.js",
+    "start": "python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}

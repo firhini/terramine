@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Owner Radar">
+  <rect width="512" height="512" rx="96" fill="#0D1B2A"/>
+  <g fill="none" stroke="#4FC3F7" stroke-width="14" opacity="0.55">
+    <circle cx="256" cy="256" r="72"/>
+    <circle cx="256" cy="256" r="128"/>
+    <circle cx="256" cy="256" r="184"/>
+  </g>
+  <path d="M256 256 L256 72 A184 184 0 0 1 386 126 Z" fill="#4FC3F7" opacity="0.28"/>
+  <circle cx="330" cy="186" r="26" fill="#FFD54F"/>
+  <circle cx="256" cy="256" r="16" fill="#F0F4FF"/>
+</svg>

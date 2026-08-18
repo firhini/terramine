@@ -1,0 +1,161 @@
+/* End-to-End-Test im echten Browser (optional).
+   Voraussetzung: Playwright + Chromium.  Start:  node tests/e2e.js
+   Laedt echte Minen-Daten von terramine.app (eine Anfrage pro Lauf). */
+const { chromium } = require('playwright');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.join(__dirname, '..');
+const PORT = 8137;
+const POS = { latitude: 40.7040, longitude: -73.9940 };   // dichter Bereich in New York
+const OUT = process.env.SHOT_DIR || path.join(ROOT, '.screenshots');
+
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+  '.json': 'application/json', '.webmanifest': 'application/manifest+json',
+  '.svg': 'image/svg+xml', '.png': 'image/png' };
+
+function serve() {
+  return new Promise(resolve => {
+    const server = http.createServer((req, res) => {
+      const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html';
+      const file = path.join(ROOT, rel);
+      if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+        res.writeHead(404); res.end('not found'); return;
+      }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+      res.end(fs.readFileSync(file));
+    });
+    server.listen(PORT, () => resolve(server));
+  });
+}
+
+const checks = [];
+function check(name, ok, detail) {
+  checks.push({ name, ok, detail });
+  console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail && !ok ? '  → ' + detail : ''));
+}
+
+(async () => {
+  fs.mkdirSync(OUT, { recursive: true });
+  const server = await serve();
+  const launch = {};
+  if (process.env.CHROME_PATH) launch.executablePath = process.env.CHROME_PATH;
+  // In abgeschotteten Umgebungen laeuft der Browser ueber den lokalen Proxy.
+  // HTTPS ueber den Proxy, HTTP (der lokale Testserver) direkt.
+  if (process.env.HTTPS_PROXY) launch.proxy = { server: 'http=direct://;https=' + process.env.HTTPS_PROXY };
+  const browser = await chromium.launch(launch);
+  const ctx = await browser.newContext({
+    viewport: { width: 412, height: 900 },
+    deviceScaleFactor: 2,
+    geolocation: POS,
+    permissions: ['geolocation'],
+    locale: 'de-DE',
+    ignoreHTTPSErrors: !!process.env.HTTPS_PROXY
+  });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+
+  await page.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
+  check('Seite laedt', await page.title() === 'Owner Radar — TerraMine Check-in Tracker');
+
+  // GPS -> Minen laden
+  await page.click('#btn-locate');
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 Minen', { timeout: 30000 });
+  const minesText = await page.textContent('#chip-mines');
+  const groupsText = await page.textContent('#chip-groups');
+  check('Minen von der Live-API geladen', /[1-9]/.test(minesText), minesText);
+  check('Gruppen gebildet', /[1-9]/.test(groupsText), groupsText);
+
+  await page.waitForSelector('#btn-checkin', { timeout: 10000 });
+  const coords1 = await page.textContent('.target-coords b');
+  check('Ziel zeigt exakte Koordinaten', /^-?\d+\.\d{5}, -?\d+\.\d{5}$/.test(coords1.trim()), coords1);
+  const listLen1 = await page.$$eval('#target-list li', n => n.length);
+  check('Weitere Ziele werden gelistet', listLen1 > 1, 'Eintraege: ' + listLen1);
+  const routeInfo = await page.textContent('#next-count');
+  check('Laufroute mit Gesamtstrecke', /Owner · .* Runde/.test(routeInfo), routeInfo);
+  check('Reihenfolge-Umschalter zeigt den Modus', (await page.textContent('#btn-order')) === 'Route');
+  await page.screenshot({ path: path.join(OUT, '01-radar.png'), fullPage: true });
+
+  // Check-in mit Ownernamen
+  await page.click('#btn-checkin');
+  await page.waitForSelector('#sheet-owner');
+  await page.fill('#sheet-owner', 'Anna');
+  await page.screenshot({ path: path.join(OUT, '02-checkin.png') });
+  await page.click('#sheet-save');
+  await page.waitForSelector('#sheet-backdrop', { state: 'hidden' });
+
+  const coords2 = await page.textContent('.target-coords b');
+  check('Neues Ziel nach dem Check-in', coords2 !== coords1, coords1 + ' -> ' + coords2);
+  const streak = await page.textContent('#streak-text');
+  check('Streak-Zaehler steht auf 1', /<b>1<\/b>|^1 /.test(streak) || streak.includes('1'), streak);
+  const cooldown = await page.textContent('#cooldown-list');
+  check('Anna steht im Cooldown', cooldown.includes('Anna'), cooldown.trim().slice(0, 80));
+
+  // Owner-Tab
+  await page.click('.tab[data-view="owners"]');
+  await page.waitForSelector('#owner-list li');
+  const ownerTxt = await page.textContent('#owner-list');
+  check('Owner-Liste zeigt Anna mit Restzeit', /Anna/.test(ownerTxt) && /in \d+ h/.test(ownerTxt), ownerTxt.replace(/\s+/g, ' ').slice(0, 120));
+  await page.screenshot({ path: path.join(OUT, '03-owner.png'), fullPage: true });
+
+  // Rueckgaengig (Sitzung)
+  await page.click('.tab[data-view="radar"]');
+  await page.click('#btn-undo');
+  await page.waitForTimeout(400);
+  const afterUndo = await page.textContent('#cooldown-list');
+  check('Rueckgaengig entfernt den Cooldown', !afterUndo.includes('Anna'), afterUndo.trim().slice(0, 80));
+
+  // erneut buchen, damit die Persistenz geprueft werden kann
+  await page.click('#btn-checkin');
+  await page.waitForSelector('#sheet-owner');
+  await page.fill('#sheet-owner', 'Anna');
+  await page.click('#sheet-save');
+  await page.waitForSelector('#sheet-backdrop', { state: 'hidden' });
+
+  // Persistenz ueber einen Neustart
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 Minen', { timeout: 30000 });
+  const cooldown2 = await page.textContent('#cooldown-list');
+  check('Cooldown ueberlebt den Neuladen', cooldown2.includes('Anna'), cooldown2.trim().slice(0, 80));
+  const coords3 = await page.textContent('.target-coords b');
+  check('Vorschlag bleibt bei einem freien Owner', coords3 !== coords1, coords3);
+
+  // Karte
+  await page.click('.tab[data-view="map"]');
+  await page.waitForSelector('.leaflet-container', { timeout: 20000 });
+  await page.waitForTimeout(2500);
+  const markers = await page.$$eval('.leaflet-interactive', n => n.length);
+  check('Karte zeichnet Minen-Marker', markers > 5, 'Marker: ' + markers);
+  await page.screenshot({ path: path.join(OUT, '04-karte.png') });
+
+  // Check-in nachtraeglich loeschen (auch nach einem Neustart moeglich)
+  await page.click('.tab[data-view="more"]');
+  await page.waitForSelector('#history-list [data-del]');
+  page.once('dialog', d => d.accept());
+  await page.click('#history-list [data-del]');
+  await page.waitForTimeout(400);
+  await page.click('.tab[data-view="radar"]');
+  const cooldown3 = await page.textContent('#cooldown-list');
+  check('geloeschter Check-in gibt den Owner wieder frei', !cooldown3.includes('Anna'), cooldown3.trim().slice(0, 80));
+
+  // Leerer Umkreis: verstaendliche Meldung statt Blindflug (API-Antwort simuliert)
+  await page.route('**/getPropertiesInViewport*', r =>
+    r.fulfill({ status: 200, contentType: 'application/json', body: '{"properties":[],"truncated":false}' }));
+  await page.click('#btn-refresh');
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent === '⛏ 0 Minen', { timeout: 15000 });
+  const emptyText = await page.textContent('#target-slot');
+  check('leerer Umkreis wird erklaert', /Keine Minen in der Naehe/.test(emptyText), emptyText.replace(/\s+/g, ' ').slice(0, 90));
+  await page.unroute('**/getPropertiesInViewport*');
+
+  check('keine JS-Fehler', errors.length === 0, errors.join(' | '));
+
+  await browser.close();
+  server.close();
+
+  const failed = checks.filter(c => !c.ok);
+  console.log(`\n${checks.length - failed.length}/${checks.length} Pruefungen bestanden · Screenshots: ${OUT}`);
+  process.exit(failed.length ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });
