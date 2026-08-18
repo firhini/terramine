@@ -502,3 +502,81 @@ test('Import legt keinen Owner auf einen belegten Schluessel', () => {
   const names = Object.keys(a.owners()).map(k => a.owner(k).name).sort();
   assert.deepEqual(names, ['Anna', 'Bob'], 'beide Owner bleiben erhalten');
 });
+
+// ── Zufallsorte weltweit ────────────────────────────────────────────────────
+const world = require(path.join(__dirname, '../assets/js/world.js'));
+
+function worldCells() {
+  return [
+    { lat: 52.520, lng: 13.405, rock: 30, coal: 10, gold: 3, diamond: 1 },  // gross, mit Diamant
+    { lat: 40.700, lng: -74.000, rock: 12, coal: 4, gold: 2, diamond: 0 },  // gross, mit Gold
+    { lat: -33.870, lng: 151.210, rock: 2, coal: 0, gold: 0, diamond: 0 },  // winzig
+    { lat: 35.680, lng: 139.760, rock: 8, coal: 1, gold: 0, diamond: 0 }    // mittel, ohne Gold
+  ];
+}
+
+test('Weltmodus filtert Zellen nach Groesse und Minentyp', () => {
+  const cells = worldCells();
+  assert.equal(world.filterCells(cells, { minMines: 1 }).length, 4);
+  assert.equal(world.filterCells(cells, { minMines: 10 }).length, 2);
+  assert.equal(world.filterCells(cells, { minMines: 1, requireType: 'diamond' }).length, 1);
+  assert.equal(world.filterCells(cells, { minMines: 1, requireType: 'gold' }).length, 2);
+  assert.equal(world.cellTotal(cells[0]), 44);
+});
+
+test('Zufallsziehung beachtet Filter und besuchte Orte', () => {
+  const cells = worldCells();
+  const exclude = {};
+  exclude[world.cellKey(cells[0])] = true;
+  const pick = world.pickCell(cells, { minMines: 10, requireType: 'any', exclude }, () => 0);
+  assert.equal(world.cellKey(pick.cell), world.cellKey(cells[1]));
+  assert.equal(pick.relaxed, false);
+});
+
+test('Zufallsziehung lockert die Filter, statt leer auszugehen', () => {
+  const cells = worldCells();
+  const exclude = {};
+  cells.forEach(c => { exclude[world.cellKey(c)] = true; });      // alles schon besucht
+  const pick = world.pickCell(cells, { minMines: 999, requireType: 'diamond', exclude }, () => 0);
+  assert.ok(pick, 'es kommt trotzdem ein Ort zurueck');
+  assert.equal(pick.relaxed, true);
+});
+
+test('Zufallsziehung streut ueber die ganze Welt', () => {
+  const cells = worldCells();
+  const seen = new Set();
+  let seed = 0;
+  const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let i = 0; i < 200; i++) seen.add(world.cellKey(world.pickCell(cells, { minMines: 1 }, rng).cell));
+  assert.equal(seen.size, 4, 'alle Zellen kommen vor');
+});
+
+test('Zellfenster umschliesst die Zelle mit etwas Rand', () => {
+  const b = world.cellBbox({ lat: 52.52, lng: 13.405 }, 0.02, 0.004);
+  assert.ok(Math.abs((b.maxLat - b.minLat) - 0.028) < 1e-9);
+  assert.ok(b.minLat < 52.51 && b.maxLat > 52.53);
+});
+
+test('besuchte Zufallsorte werden gemerkt und begrenzt', () => {
+  const s = fresh();
+  s.markCellVisited('52.520,13.405', T0);
+  s.markCellVisited('40.700,-74.000', T0 + 1000);
+  assert.deepEqual(Object.keys(s.visitedCells()).sort(), ['40.700,-74.000', '52.520,13.405']);
+
+  for (let i = 0; i < 500; i++) s.markCellVisited('c' + i, T0 + 2000 + i);
+  assert.ok(Object.keys(s.visitedCells()).length <= 400, 'aeltere Eintraege fallen raus');
+  assert.ok(!s.visitedCells()['52.520,13.405'], 'der aelteste ist weg');
+
+  s.clearVisitedCells();
+  assert.deepEqual(s.visitedCells(), {});
+});
+
+test('Weltmodus-Einstellungen ueberleben einen Neustart', () => {
+  const storage = memStorage();
+  const s1 = storeMod.createStore(storage);
+  s1.setSettings({ mode: 'world', worldMinMines: 25, worldRequireType: 'diamond' });
+  const s2 = storeMod.createStore(storage);
+  assert.equal(s2.settings().mode, 'world');
+  assert.equal(s2.settings().worldMinMines, 25);
+  assert.equal(s2.settings().worldRequireType, 'diamond');
+});

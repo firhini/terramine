@@ -40,7 +40,12 @@
   <!-- ── RADAR ─────────────────────────────────────────────────────────── -->
   <section class="view" id="view-radar">
 
-    <div class="card location-card">
+    <div class="segmented" id="mode-switch">
+      <button class="seg active" data-mode="near">📍 Umkreis</button>
+      <button class="seg" data-mode="world">🎲 Weltweit</button>
+    </div>
+
+    <div class="card location-card" id="card-near">
       <div class="card-head">
         <h2>Standort</h2>
         <button id="btn-locate" class="btn small">GPS</button>
@@ -49,14 +54,49 @@
         <code id="my-coords">–</code>
         <span class="muted" id="my-accuracy"></span>
       </div>
-      <div class="row gap">
-        <input id="input-manual" type="text" inputmode="decimal" placeholder="oder 52.52000, 13.40500" />
-        <button id="btn-manual" class="btn small ghost">setzen</button>
+      <button class="link-btn" id="btn-manual-toggle">Koordinaten von Hand eingeben</button>
+      <div id="manual-box" hidden>
+        <div class="row gap" style="margin-top:8px">
+          <input id="input-manual" type="text" inputmode="decimal" placeholder="52.52000, 13.40500" />
+          <button id="btn-manual" class="btn small ghost">setzen</button>
+        </div>
       </div>
       <label class="switch-row">
         <input type="checkbox" id="chk-follow" /> <span>Standort laufend verfolgen</span>
       </label>
     </div>
+
+    <div class="card world-card" id="card-world" hidden>
+      <div class="card-head">
+        <h2>Zufallsort</h2>
+        <span class="muted" id="world-status"></span>
+      </div>
+
+      <button class="btn big block dice" id="btn-dice">🎲 Zufallsort weltweit</button>
+
+      <div id="world-info" class="world-info" hidden></div>
+
+      <button class="link-btn" id="btn-world-filters">⚙ Filter &amp; Optionen</button>
+      <div class="world-filters" id="world-filters" hidden>
+        <label class="field compact">
+          <span>Mindestens <b id="lbl-world-min">10</b> Minen vor Ort</span>
+          <input type="range" id="rng-world-min" min="1" max="120" step="1" />
+        </label>
+        <div class="type-filters" id="world-type-filters">
+          <button class="type-chip sel" data-wtype="any">alle</button>
+          <button class="type-chip" data-wtype="coal">⚫ Kohle</button>
+          <button class="type-chip" data-wtype="gold">⭐ Gold</button>
+          <button class="type-chip" data-wtype="diamond">💎 Diamant</button>
+        </div>
+        <div class="row gap wrap" style="margin-top:10px">
+          <button class="btn small ghost" id="btn-world-map">Auf Karte zeigen</button>
+          <button class="btn small ghost" id="btn-world-reset">Besuchte Orte zuruecksetzen</button>
+        </div>
+        <p class="hint" id="world-hint">Weltdaten werden beim ersten Wuerfeln geladen (einmalig ca. 3,6 MB, danach 24 h lokal gespeichert).</p>
+      </div>
+    </div>
+
+    <div id="target-slot"></div>
 
     <div class="card streak-card">
       <div class="card-head">
@@ -67,7 +107,6 @@
       <p class="streak-text" id="streak-text">Noch keine Check-ins heute.</p>
     </div>
 
-    <div id="target-slot"></div>
 
     <div class="card" id="next-card">
       <div class="card-head">
@@ -206,6 +245,7 @@
 
 <script src="assets/js/util.js"></script>
 <script src="assets/js/cluster.js"></script>
+<script src="assets/js/world.js"></script>
 <script src="assets/js/store.js"></script>
 <script src="assets/js/api.js"></script>
 <script src="assets/js/app.js"></script>

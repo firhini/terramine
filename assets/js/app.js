@@ -6,6 +6,7 @@
   var util = TM.util, cluster = TM.cluster, api = TM.api;
   var store = TM.store.createStore(window.localStorage);
   var POS_KEY = 'terramine-owner-radar:pos';
+  var SPOT_KEY = 'terramine-owner-radar:spot';
 
   var TYPE_META = {
     rock:    { emoji: '🪨', name: 'Stein' },
@@ -15,7 +16,10 @@
   };
 
   var app = {
-    pos: null,            // { lat, lng, acc, at, source }
+    pos: null,            // { lat, lng, acc, at, source } — eigener Standort
+    worldPoint: null,     // Mittelpunkt des aktuellen Zufallsorts
+    worldCell: null,      // zugehoerige Zelle aus dem Weltdaten-Cache
+    rolling: false,
     watchId: null,
     mines: [],
     groups: [],
@@ -38,6 +42,9 @@
     return n;
   }
   function now() { return Date.now(); }
+  function mode() { return store.settings().mode === 'world' ? 'world' : 'near'; }
+  /* Punkt, auf den sich Entfernungen, Suche und Route beziehen. */
+  function origin() { return mode() === 'world' ? app.worldPoint : app.pos; }
   function felder(n) { return n + (n === 1 ? ' Feld' : ' Felder'); }
 
   // ── Toast / Sheet ─────────────────────────────────────────────────────────
@@ -68,6 +75,20 @@
     recompute();
     renderAll();
     updateMeOnMap();
+  }
+
+  function saveWorldSpot() {
+    try { localStorage.setItem(SPOT_KEY, JSON.stringify(app.worldCell || null)); } catch (e) {}
+  }
+
+  function restoreWorldSpot() {
+    try {
+      var c = JSON.parse(localStorage.getItem(SPOT_KEY) || 'null');
+      if (c && isFinite(c.lat) && isFinite(c.lng)) {
+        app.worldCell = c;
+        app.worldPoint = { lat: c.lat, lng: c.lng };
+      }
+    } catch (e) {}
   }
 
   function restorePosition() {
@@ -115,6 +136,7 @@
 
   // ── Daten laden ───────────────────────────────────────────────────────────
   function maybeAutoRefresh() {
+    if (mode() === 'world') return;      // im Weltmodus zaehlt der gewuerfelte Ort, nicht die eigene Bewegung
     if (!app.pos || app.loading) return;
     if (!app.fetchCenter) return;
     var moved = util.distance(app.pos.lat, app.pos.lng, app.fetchCenter.lat, app.fetchCenter.lng);
@@ -124,12 +146,21 @@
   }
 
   function refresh(force) {
-    if (!app.pos) { toast('Erst Standort setzen — GPS antippen oder Koordinaten eintragen.', 'err'); return; }
+    var from = origin();
+    if (!from) {
+      toast(mode() === 'world'
+        ? 'Erst einen Zufallsort wuerfeln.'
+        : 'Erst Standort setzen — GPS antippen oder Koordinaten eintragen.', 'err');
+      return;
+    }
     if (app.loading) return;
     app.loading = true;
     $('btn-refresh').classList.add('spin');
     var s = store.settings();
-    api.fetchMines(app.pos.lat, app.pos.lng, s.radiusM, force).then(function (res) {
+    var req = mode() === 'world' && app.worldCell
+      ? api.fetchMinesInBounds(TM.world.cellBbox(app.worldCell), { center: from }, force)
+      : api.fetchMines(from.lat, from.lng, s.radiusM, force);
+    return req.then(function (res) {
       app.mines = res.mines;
       app.fetchedAt = res.fetchedAt;
       app.fetchCenter = res.center;
@@ -159,14 +190,182 @@
 
   function recompute() {
     var s = store.settings();
+    var from = origin();
     app.groups = cluster.clusterMines(app.mines, s.linkM);
-    app.targets = app.pos ? store.selectTargets(app.groups, app.pos, now(), s.maxTargets) : [];
+    app.targets = from ? store.selectTargets(app.groups, from, now(), s.maxTargets) : [];
+  }
+
+  // ── Weltmodus ─────────────────────────────────────────────────────────────
+  function setMode(m) {
+    store.setSettings({ mode: m });
+    document.querySelectorAll('#mode-switch .seg').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-mode') === m);
+    });
+    $('card-near').hidden = m !== 'near';
+    $('card-world').hidden = m === 'near';
+
+    // Die geladenen Minen gehoeren zum alten Bezugspunkt — sauber neu laden.
+    app.mines = [];
+    app.fetchedAt = 0;
+    app.mapDirty = true;
+    recompute();
+    renderAll();
+    updateMap();
+    if (origin()) refresh(true);
+  }
+
+  /* Weltdaten sicherstellen — beim ersten Mal mit Nachfrage und Fortschritt. */
+  function ensureWorldData() {
+    if (api.hasWorldCache()) return api.fetchWorldCells();
+    return new Promise(function (resolve, reject) {
+      openSheet('Weltdaten laden', function (body) {
+        body.innerHTML =
+          '<p class="muted" style="margin-bottom:12px">Fuer Zufallsorte braucht die App einmalig die ' +
+          'Uebersicht aller Minen-Gegenden der Welt: <b>ca. 3,6 MB</b>. Danach liegt sie 24 Stunden lokal ' +
+          'auf dem Geraet — am besten im WLAN laden.</p>' +
+          '<div class="progress" id="dl-wrap" hidden><div id="dl-bar"></div></div>' +
+          '<p class="hint" id="dl-text" hidden>Lade …</p>' +
+          '<div class="sheet-buttons" style="margin-top:14px">' +
+            '<button class="btn block" id="dl-start">Jetzt laden</button>' +
+            '<button class="btn ghost" id="dl-cancel" style="grid-column:1/-1">Abbrechen</button>' +
+          '</div>';
+
+        body.querySelector('#dl-cancel').addEventListener('click', function () {
+          closeSheet();
+          reject(new Error('Abgebrochen.'));
+        });
+        body.querySelector('#dl-start').addEventListener('click', function () {
+          var btn = body.querySelector('#dl-start');
+          btn.disabled = true;
+          btn.textContent = 'Laedt …';
+          body.querySelector('#dl-wrap').hidden = false;
+          body.querySelector('#dl-text').hidden = false;
+          api.fetchWorldCells({
+            onProgress: function (loaded, total) {
+              var mb = (loaded / 1048576).toFixed(1).replace('.', ',');
+              var bar = body.querySelector('#dl-bar');
+              var txt = body.querySelector('#dl-text');
+              if (!bar || !txt) return;
+              if (total) bar.style.width = Math.min(100, loaded / total * 100) + '%';
+              txt.textContent = mb + ' MB geladen' + (total ? ' von ' + (total / 1048576).toFixed(1).replace('.', ',') + ' MB' : '');
+            }
+          }).then(function (data) {
+            closeSheet();
+            resolve(data);
+          }).catch(function (err) {
+            closeSheet();
+            reject(err);
+          });
+        });
+      });
+    });
+  }
+
+  function updateDiceUI(text) {
+    var b = $('btn-dice');
+    b.disabled = app.rolling;
+    b.textContent = text || (app.rolling ? 'Suche Ort …' : (app.worldCell ? '🎲 Naechster Zufallsort' : '🎲 Zufallsort weltweit'));
+  }
+
+  /* Zufallsort ziehen. Findet sich dort kein freier Owner, wird automatisch
+     weitergewuerfelt — so kommt immer ein brauchbares Ziel zurueck. */
+  function rollRandom() {
+    if (app.rolling) return Promise.resolve();
+    app.rolling = true;
+    updateDiceUI();
+
+    var maxTries = 6;
+
+    function attempt(n) {
+      var s = store.settings();
+      return api.fetchWorldCells().then(function (data) {
+        var pick = TM.world.pickCell(data.cells, {
+          minMines: s.worldMinMines,
+          requireType: s.worldRequireType,
+          exclude: store.visitedCells()
+        });
+        if (!pick) throw new Error('Keine passende Gegend in den Weltdaten gefunden.');
+
+        app.worldCell = pick.cell;
+        app.worldPoint = { lat: pick.cell.lat, lng: pick.cell.lng };
+        store.markCellVisited(TM.world.cellKey(pick.cell));
+        saveWorldSpot();
+        updateDiceUI('Suche Ort … ' + n + '/' + maxTries);
+
+        return api.fetchMinesInBounds(TM.world.cellBbox(pick.cell), { center: app.worldPoint }, false)
+          .then(function (res) {
+            app.mines = res.mines;
+            app.fetchedAt = res.fetchedAt;
+            app.fetchCenter = res.center;
+            app.truncated = res.truncated;
+            app.mapDirty = true;
+            app.pinnedMineId = null;
+            recompute();
+            if (!app.targets.length && n < maxTries) return attempt(n + 1);
+            return null;
+          });
+      });
+    }
+
+    return ensureWorldData()
+      .then(function () { return attempt(1); })
+      .then(function () {
+        renderAll();
+        updateMap();
+        if (app.mapReady && app.worldPoint) app.map.setView([app.worldPoint.lat, app.worldPoint.lng], 16);
+        var t = app.targets[0];
+        toast(t
+          ? '🎲 ' + app.mines.length + ' Minen vor Ort · naechstes Ziel ' + util.fmtDist(t.distance)
+          : 'Hier ist gerade kein freier Owner — nochmal wuerfeln.', t ? 'ok' : 'err');
+      })
+      .catch(function (err) {
+        if (err && err.message !== 'Abgebrochen.') toast(err.message || 'Wuerfeln fehlgeschlagen.', 'err');
+      })
+      .finally(function () {
+        app.rolling = false;
+        updateDiceUI();
+        renderWorldCard();
+      });
+  }
+
+  function renderWorldCard() {
+    var s = store.settings();
+    $('rng-world-min').value = s.worldMinMines;
+    $('lbl-world-min').textContent = s.worldMinMines;
+    document.querySelectorAll('#world-type-filters [data-wtype]').forEach(function (b) {
+      b.classList.toggle('sel', b.getAttribute('data-wtype') === s.worldRequireType);
+    });
+    var visited = Object.keys(store.visitedCells()).length;
+    $('world-status').textContent = visited ? visited + (visited === 1 ? ' Ort besucht' : ' Orte besucht') : '';
+
+    var info = $('world-info');
+    if (!app.worldCell) { info.hidden = true; return; }
+    info.hidden = false;
+
+    // Nach dem Laden zaehlen die echten Minen, vorher die Schaetzung aus der Weltuebersicht.
+    var meta;
+    if (app.mines.length) {
+      var c = { rock: 0, coal: 0, gold: 0, diamond: 0 };
+      app.mines.forEach(function (m) { if (c[m.type] != null) c[m.type]++; });
+      meta = app.mines.length + ' Minen geladen · ' + TM.world.describeCell(c);
+    } else {
+      meta = 'laut Weltuebersicht ' + TM.world.cellTotal(app.worldCell) + ' Minen · ' + TM.world.describeCell(app.worldCell);
+    }
+
+    info.innerHTML =
+      '<div class="row gap"><code>' + util.fmtCoord(app.worldCell.lat, app.worldCell.lng) + '</code>' +
+      '<button class="copy-btn" id="btn-copy-spot" title="Ort kopieren">📋</button></div>' +
+      '<div class="world-meta">' + meta + '</div>';
+    $('btn-copy-spot').addEventListener('click', function () {
+      copyText(util.fmtCoord(app.worldCell.lat, app.worldCell.lng), this);
+    });
   }
 
   // ── Rendern ───────────────────────────────────────────────────────────────
   function renderAll() {
     renderStatus();
     renderLocation();
+    renderWorldCard();
     renderStreak();
     renderTarget();
     renderTargetList();
@@ -179,8 +378,13 @@
 
   function renderStatus() {
     var gps = $('chip-gps');
-    if (!app.pos) { gps.textContent = '📍 kein Standort'; gps.className = 'chip bad'; }
-    else {
+    if (mode() === 'world') {
+      gps.textContent = app.worldPoint ? '🎲 ' + util.fmtCoord(app.worldPoint.lat, app.worldPoint.lng) : '🎲 noch nicht gewuerfelt';
+      gps.className = 'chip' + (app.worldPoint ? ' good' : ' bad');
+    } else if (!app.pos) {
+      gps.textContent = '📍 kein Standort';
+      gps.className = 'chip bad';
+    } else {
       gps.textContent = '📍 ' + (app.pos.source === 'gps' ? 'GPS' : 'manuell') +
         (app.pos.acc ? ' ±' + Math.round(app.pos.acc) + ' m' : '');
       gps.className = 'chip good';
@@ -230,28 +434,39 @@
     var slot = $('target-slot');
     slot.innerHTML = '';
     var t = activeTarget();
+    var world = mode() === 'world';
 
-    if (!app.pos) {
+    if (world && !app.worldPoint) {
+      slot.appendChild(el('div', 'card', '<div class="card-head"><h2>Wuerfeln</h2></div>' +
+        '<p class="hint">Tippe oben auf <b>🎲 Zufallsort weltweit</b> — die App sucht eine beliebige ' +
+        'Gegend auf der Welt mit Minen und zeigt dir dort die naechste Mine eines Owners ohne Check-in ' +
+        'in den letzten ' + store.settings().cooldownH + ' Stunden.</p>'));
+      return;
+    }
+    if (!world && !app.pos) {
       slot.appendChild(el('div', 'card', '<div class="card-head"><h2>Los geht\'s</h2></div>' +
-        '<p class="hint">Setz oben deinen Standort (GPS oder Koordinaten) — danach sucht der Radar automatisch die naechste Mine eines Owners, den du heute noch nicht hattest.</p>'));
+        '<p class="hint">Setz oben deinen Standort (GPS oder Koordinaten) — danach sucht der Radar automatisch ' +
+        'die naechste Mine eines Owners, den du heute noch nicht hattest. Oder wechsle oben auf ' +
+        '<b>🎲 Weltweit</b>.</p>'));
       return;
     }
     if (!app.mines.length) {
       slot.appendChild(el('div', 'card', app.fetchedAt
         ? '<div class="card-head"><h2>Keine Minen in der Naehe</h2></div>' +
-          '<p class="hint">Im Umkreis von ' + util.fmtDist(store.settings().radiusM) +
-          ' ist kein einziges Feld vergeben. Erhoehe den Radius (Tab <b>Mehr</b>) oder such dir ueber die Karte ' +
-          'eine Gegend mit Spielern.</p>'
+          '<p class="hint">' + (world
+            ? 'An diesem Zufallsort ist nichts zu holen — einfach nochmal wuerfeln.'
+            : 'Im Umkreis von ' + util.fmtDist(store.settings().radiusM) + ' ist kein einziges Feld vergeben. ' +
+              'Erhoehe den Radius (Tab <b>Mehr</b>) oder wechsle auf <b>🎲 Weltweit</b>.') + '</p>'
         : '<div class="card-head"><h2>Keine Daten</h2></div>' +
           '<p class="hint">Noch keine Minen geladen. Tippe oben rechts auf ⟳.</p>'));
       return;
     }
     if (!t) {
-      var free = app.groups.length;
       slot.appendChild(el('div', 'card', '<div class="card-head"><h2>Kein freier Owner</h2></div>' +
-        '<p class="hint">Alle ' + free + ' Gruppen im Umkreis von ' + util.fmtDist(store.settings().radiusM) +
-        ' sind im Cooldown, uebersprungen oder durch den Typfilter ausgeblendet. ' +
-        'Erhoehe den Radius, lockere den Filter — oder schau unten, wann der naechste Owner frei wird.</p>'));
+        '<p class="hint">Alle ' + app.groups.length + ' Gruppen hier sind im Cooldown, uebersprungen oder ' +
+        'durch den Typfilter ausgeblendet. ' + (world
+          ? 'Wuerfle einen neuen Ort.'
+          : 'Erhoehe den Radius, lockere den Filter — oder schau unten, wann der naechste Owner frei wird.') + '</p>'));
       return;
     }
 
@@ -270,12 +485,12 @@
     card.innerHTML =
       '<div class="target-head"><span class="target-label">Naechstes Ziel</span>' + typeBadge(m.type) + '</div>' +
       '<button class="target-coords" id="btn-copy-coords">' +
-        '<span><b>' + util.fmtCoord(m.lat, m.lng) + '</b>' +
-        '<small>exakte Feldmitte · Raster ca. 11 m</small></span>' +
-        '<span class="copy-hint">kopieren</span>' +
+        '<b>' + util.fmtCoord(m.lat, m.lng) + '</b>' +
+        '<span class="coords-sub"><small>Feldmitte · Raster ~11 m</small>' +
+        '<span class="copy-hint">tippen zum Kopieren</span></span>' +
       '</button>' +
       '<div class="target-facts">' +
-        '<div class="fact"><b>' + util.fmtDist(t.distance) + '</b><span>Entfernung</span></div>' +
+        '<div class="fact"><b>' + util.fmtDist(t.distance) + '</b><span>' + (world ? 'ab Zufallsort' : 'Entfernung') + '</span></div>' +
         '<div class="fact"><b><span class="arrow" style="transform:rotate(' + Math.round(t.bearing) + 'deg)">↑</span> ' +
           util.compass(t.bearing) + '</b><span>Richtung</span></div>' +
         '<div class="fact"><b>' + g.size + '</b><span>Felder im Block</span></div>' +
@@ -283,14 +498,16 @@
       '</div>' +
       '<div class="row gap wrap" style="margin-bottom:12px">' + ownerHtml + lastSeen + '</div>' +
       '<div class="target-actions">' +
-        '<button class="btn block big" id="btn-checkin">✅ Check-in gemacht</button>' +
-        '<a class="btn small ghost" id="btn-nav" href="' + navUrl(m) + '" target="_blank" rel="noopener">🧭 Navigation</a>' +
+        '<button class="btn big block" id="btn-checkin">✅ Check-in gemacht</button>' +
+        '<button class="btn ghost" id="btn-copy-btn">📋 Kopieren</button>' +
+        '<a class="btn ghost" id="btn-nav" href="' + navUrl(m) + '" target="_blank" rel="noopener">🧭 Karte</a>' +
         '<button class="btn small ghost" id="btn-skip">⏭ Spaeter</button>' +
         '<button class="btn small ghost" id="btn-block">🚫 Nicht erreichbar</button>' +
       '</div>';
     slot.appendChild(card);
 
-    $('btn-copy-coords').addEventListener('click', function () { copyCoords(m); });
+    $('btn-copy-coords').addEventListener('click', function () { copyCoords(m, this); });
+    $('btn-copy-btn').addEventListener('click', function () { copyCoords(m, this); });
     $('btn-checkin').addEventListener('click', function () { openCheckIn(t); });
     $('btn-skip').addEventListener('click', function () {
       store.snoozeGroup(g.id, store.settings().skipHours);
@@ -304,9 +521,27 @@
     return 'https://www.google.com/maps/dir/?api=1&destination=' + m.lat.toFixed(5) + ',' + m.lng.toFixed(5) + '&travelmode=walking';
   }
 
-  function copyCoords(m) {
-    var text = m.lat.toFixed(5) + ', ' + m.lng.toFixed(5);
-    var done = function () { toast('Koordinaten kopiert: ' + text, 'ok'); };
+  function copyCoords(m, btn) {
+    copyText(m.lat.toFixed(5) + ', ' + m.lng.toFixed(5), btn);
+  }
+
+  /* Ein Tipp = Koordinaten in der Zwischenablage, mit sichtbarer und
+     fuehlbarer Rueckmeldung (auf dem Handy die wichtigste Aktion). */
+  function copyText(text, btn) {
+    function done() {
+      if (navigator.vibrate) { try { navigator.vibrate(25); } catch (e) {} }
+      if (btn) {
+        btn.classList.add('copied');
+        var hint = btn.querySelector('.copy-hint');
+        var prev = hint ? hint.textContent : null;
+        if (hint) hint.textContent = 'kopiert ✓';
+        setTimeout(function () {
+          btn.classList.remove('copied');
+          if (hint && prev) hint.textContent = prev;
+        }, 1600);
+      }
+      toast('📋 ' + text, 'ok');
+    }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
     } else fallbackCopy(text, done);
@@ -350,7 +585,12 @@
         (x.ownerName ? util.escapeHtml(x.ownerName) : 'neuer Owner') + ' · ' + felder(x.group.size) + '</span></span>' +
         (routeMode
           ? '<span class="dist">+' + util.fmtDist(x.legDistance) + '<small>' + util.fmtDist(x.totalDistance) + ' ab Ziel 1</small></span>'
-          : '<span class="dist">' + util.fmtDist(x.distance) + ' ' + util.compass(x.bearing) + '</span>');
+          : '<span class="dist">' + util.fmtDist(x.distance) + ' ' + util.compass(x.bearing) + '</span>') +
+        '<button class="copy-btn" title="Koordinaten kopieren">📋</button>';
+      li.querySelector('.copy-btn').addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        copyCoords(x.mine, this);
+      });
       li.addEventListener('click', function () {
         app.pinnedMineId = x.mine.id;
         renderTarget(); renderTargetList();
@@ -648,7 +888,7 @@
     root.querySelectorAll('[data-pop]').forEach(function (b) {
       b.addEventListener('click', function () {
         var act = b.getAttribute('data-pop');
-        if (act === 'copy') copyCoords(m);
+        if (act === 'copy') copyCoords(m, b);
         else if (act === 'nav') window.open(navUrl(m), '_blank', 'noopener');
         else {
           app.map.closePopup();
@@ -674,6 +914,44 @@
   function switchView(name) {
     app.view = name;
     ['radar', 'map', 'owners', 'more'].forEach(function (v) { $('view-' + v).hidden = v !== name; });
+    document.querySelectorAll('#mode-switch .seg').forEach(function (b) {
+      b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
+    });
+    $('btn-dice').addEventListener('click', function () { rollRandom(); });
+    $('btn-world-map').addEventListener('click', function () {
+      if (!app.worldPoint) { toast('Erst einen Zufallsort wuerfeln.', 'err'); return; }
+      switchView('map');
+      initMap().then(function () {
+        if (app.map) app.map.setView([app.worldPoint.lat, app.worldPoint.lng], 16);
+      });
+    });
+    $('btn-world-reset').addEventListener('click', function () {
+      store.clearVisitedCells();
+      renderWorldCard();
+      toast('Besuchte Zufallsorte zurueckgesetzt.', 'ok');
+    });
+    $('rng-world-min').addEventListener('input', function () { $('lbl-world-min').textContent = this.value; });
+    $('rng-world-min').addEventListener('change', function () {
+      store.setSettings({ worldMinMines: +this.value });
+      renderWorldCard();
+    });
+    document.querySelectorAll('#world-type-filters [data-wtype]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        store.setSettings({ worldRequireType: b.getAttribute('data-wtype') });
+        renderWorldCard();
+      });
+    });
+    $('btn-world-filters').addEventListener('click', function () {
+      var box = $('world-filters');
+      box.hidden = !box.hidden;
+      this.textContent = box.hidden ? '⚙ Filter & Optionen' : '⚙ Filter schliessen';
+    });
+    $('btn-manual-toggle').addEventListener('click', function () {
+      var box = $('manual-box');
+      box.hidden = !box.hidden;
+      if (!box.hidden) $('input-manual').focus();
+    });
+
     document.querySelectorAll('.tab').forEach(function (t) {
       t.classList.toggle('active', t.getAttribute('data-view') === name);
     });
@@ -721,6 +999,44 @@
     });
     $('input-manual').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('btn-manual').click(); });
     $('chk-follow').addEventListener('change', function () { setFollow(this.checked); });
+
+    document.querySelectorAll('#mode-switch .seg').forEach(function (b) {
+      b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
+    });
+    $('btn-dice').addEventListener('click', function () { rollRandom(); });
+    $('btn-world-map').addEventListener('click', function () {
+      if (!app.worldPoint) { toast('Erst einen Zufallsort wuerfeln.', 'err'); return; }
+      switchView('map');
+      initMap().then(function () {
+        if (app.map) app.map.setView([app.worldPoint.lat, app.worldPoint.lng], 16);
+      });
+    });
+    $('btn-world-reset').addEventListener('click', function () {
+      store.clearVisitedCells();
+      renderWorldCard();
+      toast('Besuchte Zufallsorte zurueckgesetzt.', 'ok');
+    });
+    $('rng-world-min').addEventListener('input', function () { $('lbl-world-min').textContent = this.value; });
+    $('rng-world-min').addEventListener('change', function () {
+      store.setSettings({ worldMinMines: +this.value });
+      renderWorldCard();
+    });
+    document.querySelectorAll('#world-type-filters [data-wtype]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        store.setSettings({ worldRequireType: b.getAttribute('data-wtype') });
+        renderWorldCard();
+      });
+    });
+    $('btn-world-filters').addEventListener('click', function () {
+      var box = $('world-filters');
+      box.hidden = !box.hidden;
+      this.textContent = box.hidden ? '⚙ Filter & Optionen' : '⚙ Filter schliessen';
+    });
+    $('btn-manual-toggle').addEventListener('click', function () {
+      var box = $('manual-box');
+      box.hidden = !box.hidden;
+      if (!box.hidden) $('input-manual').focus();
+    });
 
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () { switchView(t.getAttribute('data-view')); });
@@ -788,6 +1104,14 @@
     wire();
     syncSettingsUI();
     restorePosition();
+    restoreWorldSpot();
+
+    var m = mode();
+    document.querySelectorAll('#mode-switch .seg').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-mode') === m);
+    });
+    $('card-near').hidden = m !== 'near';
+    $('card-world').hidden = m === 'near';
 
     var cached = api.loadCache();
     if (cached && cached.mines.length) {
@@ -798,7 +1122,7 @@
     recompute();
     renderAll();
 
-    if (app.pos) refresh();
+    if (origin()) refresh();
 
     // Cooldown-Restzeiten und Datenalter laufen mit.
     setInterval(function () {

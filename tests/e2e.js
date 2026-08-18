@@ -46,10 +46,10 @@ function check(name, ok, detail) {
   if (process.env.HTTPS_PROXY) launch.proxy = { server: 'http=direct://;https=' + process.env.HTTPS_PROXY };
   const browser = await chromium.launch(launch);
   const ctx = await browser.newContext({
-    viewport: { width: 412, height: 900 },
+    viewport: { width: 390, height: 844 },   // iPhone-Format
     deviceScaleFactor: 2,
     geolocation: POS,
-    permissions: ['geolocation'],
+    permissions: ['geolocation', 'clipboard-read', 'clipboard-write'],
     locale: 'de-DE',
     ignoreHTTPSErrors: !!process.env.HTTPS_PROXY
   });
@@ -140,6 +140,61 @@ function check(name, ok, detail) {
   await page.click('.tab[data-view="radar"]');
   const cooldown3 = await page.textContent('#cooldown-list');
   check('geloeschter Check-in gibt den Owner wieder frei', !cooldown3.includes('Anna'), cooldown3.trim().slice(0, 80));
+
+  // Koordinaten mit einem Tipp in die Zwischenablage
+  await page.click('.tab[data-view="radar"]');
+  const shownCoords = (await page.textContent('.target-coords b')).trim();
+  await page.click('#btn-copy-coords');
+  await page.waitForTimeout(300);
+  const clip = (await page.evaluate(() => navigator.clipboard.readText())).trim();
+  check('Ein Tipp kopiert die Koordinaten', clip === shownCoords, `Zwischenablage: "${clip}" / angezeigt: "${shownCoords}"`);
+  check('Kopieren wird sichtbar bestaetigt', (await page.textContent('.target-coords .copy-hint')).includes('kopiert'));
+
+  // Weltweit-Modus mit einem kleinen, stabilen Weltdatensatz
+  const WORLD = {
+    generatedAt: '2026-08-18T00:00:00.000Z', totalProperties: 3, cellSizeDegrees: 0.02,
+    cells: [
+      { lat: 40.7040, lng: -73.9940, rock: 20, coal: 6, gold: 2, diamond: 1 },
+      { lat: 48.8570, lng: 2.3520, rock: 15, coal: 5, gold: 1, diamond: 0 },
+      { lat: 35.6800, lng: 139.7600, rock: 12, coal: 3, gold: 0, diamond: 0 }
+    ]
+  };
+  await page.route('**/getHeatmapData*', r =>
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WORLD) }));
+
+  await page.click('#mode-switch .seg[data-mode="world"]');
+  await page.waitForSelector('#card-world:not([hidden])');
+  check('Weltmodus zeigt die Zufallsort-Karte', await page.isVisible('#btn-dice'));
+
+  await page.click('#btn-dice');
+  await page.waitForSelector('#dl-start', { timeout: 10000 });
+  check('Weltdaten werden vor dem Laden angekuendigt', (await page.textContent('#sheet-body')).includes('3,6 MB'));
+  await page.click('#dl-start');
+  await page.waitForSelector('#sheet-backdrop', { state: 'hidden', timeout: 20000 });
+  await page.waitForSelector('#world-info:not([hidden])', { timeout: 20000 });
+
+  const spotChip = await page.textContent('#chip-gps');
+  check('Zufallsort ist gesetzt', /🎲 -?\d+\.\d{5}/.test(spotChip), spotChip);
+  const worldCoords = await page.textContent('.target-coords b');
+  check('Zufallsort liefert ein Ziel mit exakten Koordinaten', /^-?\d+\.\d{5}, -?\d+\.\d{5}$/.test(worldCoords.trim()), worldCoords);
+  await page.screenshot({ path: path.join(OUT, '05-weltweit.png'), fullPage: true });
+
+  // erneut wuerfeln landet woanders
+  const before = await page.textContent('#chip-gps');
+  await page.click('#btn-dice');
+  await page.waitForFunction(prev => document.querySelector('#chip-gps').textContent !== prev, before, { timeout: 30000 });
+  check('Nochmal wuerfeln fuehrt an einen anderen Ort', (await page.textContent('#chip-gps')) !== before);
+
+  // Ort ueberlebt den Wechsel in die Spiel-App (Seite wird neu geladen)
+  const spotBefore = await page.textContent('#chip-gps');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#card-world:not([hidden])', { timeout: 15000 });
+  check('Zufallsort bleibt nach dem Neuladen erhalten', (await page.textContent('#chip-gps')) === spotBefore,
+    spotBefore + ' -> ' + (await page.textContent('#chip-gps')));
+  await page.unroute('**/getHeatmapData*');
+  await page.click('#mode-switch .seg[data-mode="near"]');
+  await page.waitForSelector('#card-near:not([hidden])');
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 Minen', { timeout: 30000 });
 
   // Leerer Umkreis: verstaendliche Meldung statt Blindflug (API-Antwort simuliert)
   await page.route('**/getPropertiesInViewport*', r =>

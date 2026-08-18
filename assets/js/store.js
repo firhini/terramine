@@ -29,12 +29,16 @@
         preferRare: true,
         skipHours: 3,
         routeOrder: true,
+        mode: 'near',                 // 'near' = eigener Umkreis, 'world' = Zufallsorte weltweit
+        worldMinMines: 10,            // Mindestzahl Minen in einer Zufallszelle
+        worldRequireType: 'any',      // 'any' | 'coal' | 'gold' | 'diamond'
         maxTargets: 10
       },
       owners: {},
       mines: {},
       groups: {},
       checkIns: [],
+      worldVisited: {},
       seq: 0
     };
   }
@@ -53,6 +57,7 @@
     s.mines = raw.mines || {};
     s.groups = raw.groups || {};
     s.checkIns = Array.isArray(raw.checkIns) ? raw.checkIns : [];
+    s.worldVisited = raw.worldVisited && typeof raw.worldVisited === 'object' ? raw.worldVisited : {};
     s.seq = raw.seq || 0;
     s.v = 1;
     return s;
@@ -494,6 +499,29 @@
       return true;
     }
 
+    // ── Zufallsorte (Weltmodus) ─────────────────────────────────────────────
+    var MAX_VISITED = 400;
+
+    function visitedCells() { return state.worldVisited; }
+
+    /* Besuchte Zelle merken, damit der Wuerfel nicht staendig dieselbe Gegend zieht. */
+    function markCellVisited(key, when) {
+      state.worldVisited[key] = when || Date.now();
+      var keys = Object.keys(state.worldVisited);
+      if (keys.length > MAX_VISITED) {
+        keys.sort(function (a, b) { return state.worldVisited[a] - state.worldVisited[b]; })
+            .slice(0, keys.length - MAX_VISITED)
+            .forEach(function (k) { delete state.worldVisited[k]; });
+      }
+      save(); emit();
+    }
+
+    function clearVisitedCells() {
+      pushUndo('Zufallsorte zurueckgesetzt');
+      state.worldVisited = {};
+      save(); emit();
+    }
+
     // ── Statistik ───────────────────────────────────────────────────────────
     function stats(now) {
       now = now || Date.now();
@@ -594,7 +622,8 @@
       mineRec: mineRec, ensureMine: ensureMine, blockMine: blockMine, unblockMine: unblockMine,
       groupRec: groupRec, ensureGroup: ensureGroup, setMultiOwner: setMultiOwner, snoozeGroup: snoozeGroup,
       groupOwnerKeys: groupOwnerKeys, groupStatus: groupStatus, mineStatus: mineStatus,
-      selectTargets: selectTargets, routeTargets: routeTargets, checkIn: checkIn, deleteCheckIn: deleteCheckIn, stats: stats,
+      selectTargets: selectTargets, routeTargets: routeTargets,
+      visitedCells: visitedCells, markCellVisited: markCellVisited, clearVisitedCells: clearVisitedCells, checkIn: checkIn, deleteCheckIn: deleteCheckIn, stats: stats,
       exportJson: exportJson, importJson: importJson,
       undo: undo, canUndo: canUndo, undoLabel: undoLabel
     };

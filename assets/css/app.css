@@ -29,6 +29,7 @@ body {
 }
 
 button, input, select { font-family: inherit; font-size: inherit; color: inherit; }
+button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 code, .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace; }
 .muted { color: var(--gray); font-size: 13px; }
 .hint  { color: var(--gray); font-size: 13px; margin-top: 6px; }
@@ -51,7 +52,7 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, mono
 .brand-text span { color: var(--white); }
 .topbar-right { display: flex; gap: 8px; }
 .icon-btn {
-  width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
+  width: 44px; height: 44px; border-radius: 10px; cursor: pointer;
   background: var(--surface); border: 1px solid var(--border); color: var(--white);
   font-size: 18px; line-height: 1; transition: background .15s, border-color .15s;
 }
@@ -84,7 +85,7 @@ main { padding: 14px 14px 0; max-width: 720px; margin: 0 auto; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .card-head h2, .card-head .head-actions { }
 .head-actions { display: flex; gap: 6px; }
-.link-btn { background: none; border: none; color: var(--cyan); font-size: 12px; cursor: pointer; padding: 2px 4px; }
+.link-btn { min-height: 40px; background: none; border: none; color: var(--cyan); font-size: 13px; cursor: pointer; padding: 8px 4px; }
 .link-btn:hover { text-decoration: underline; }
 .card-head h2 {
   font-family: 'Bebas Neue', sans-serif; font-size: 17px; letter-spacing: 1.6px;
@@ -96,17 +97,17 @@ main { padding: 14px 14px 0; max-width: 720px; margin: 0 auto; }
 
 a.btn { text-decoration: none; text-align: center; }
 .btn {
-  padding: 11px 16px; border-radius: 10px; cursor: pointer; font-weight: 700;
+  min-height: 48px; padding: 12px 16px; border-radius: 12px; cursor: pointer; font-weight: 700;
   background: var(--cyan); color: var(--navy); border: 1px solid transparent;
   transition: opacity .15s, background .15s;
 }
 .btn:hover  { opacity: .88; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn.small  { padding: 7px 12px; font-size: 13px; border-radius: 9px; }
+.btn.small  { min-height: 40px; padding: 8px 13px; font-size: 13px; border-radius: 10px; }
 .btn.ghost  { background: var(--surface-2); color: var(--white); border-color: var(--border); }
 .btn.danger { background: transparent; color: var(--red); border-color: rgba(255,107,107,.4); }
 .btn.block  { width: 100%; }
-.btn.big    { padding: 15px 18px; font-size: 16px; }
+.btn.big    { min-height: 58px; padding: 16px 18px; font-size: 17px; }
 
 input[type=text], input[type=number] {
   flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px;
@@ -148,14 +149,17 @@ input[type=checkbox] { accent-color: var(--cyan); width: 17px; height: 17px; }
 .type-diamond { color: #80DEEA; border-color: rgba(128,222,234,.5); }
 
 .target-coords {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 100%; padding: 13px 14px; margin-bottom: 12px; cursor: pointer; text-align: left;
+  display: block; width: 100%; padding: 14px; margin-bottom: 12px; cursor: pointer; text-align: left;
   background: rgba(0,0,0,.35); border: 1px dashed rgba(79,195,247,.45); border-radius: 12px;
 }
 .target-coords:hover { border-style: solid; }
-.target-coords b { font-family: 'JetBrains Mono', monospace; font-size: 19px; letter-spacing: .5px; color: var(--white); }
-.target-coords small { color: var(--gray); font-size: 11px; display: block; margin-top: 2px; }
-.target-coords .copy-hint { color: var(--cyan); font-size: 12px; white-space: nowrap; }
+.target-coords b {
+  display: block; font-family: 'JetBrains Mono', monospace; color: var(--white);
+  font-size: clamp(17px, 5.4vw, 22px); letter-spacing: 0; white-space: nowrap;
+}
+.coords-sub { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.target-coords small { color: var(--gray); font-size: 11px; }
+.target-coords .copy-hint { color: var(--cyan); font-size: 12px; white-space: nowrap; font-weight: 700; }
 
 .target-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 14px; margin-bottom: 12px; }
 .fact { min-width: 0; }
@@ -238,7 +242,7 @@ input[type=checkbox] { accent-color: var(--cyan); width: 17px; height: 17px; }
 }
 .tab {
   display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
-  padding: 9px 4px 10px; background: none; border: none; color: var(--gray); font-size: 11px;
+  min-height: 56px; padding: 9px 4px 10px; background: none; border: none; color: var(--gray); font-size: 11px;
 }
 .tab span { font-size: 19px; line-height: 1.1; }
 .tab.active { color: var(--cyan); }
@@ -288,3 +292,42 @@ input[type=checkbox] { accent-color: var(--cyan); width: 17px; height: 17px; }
   .target-actions { grid-template-columns: repeat(3, 1fr); }
   .target-actions .btn.block { grid-column: 1 / -1; }
 }
+
+
+/* ── Modusumschalter ───────────────────────────────────────────────────── */
+.segmented {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; margin-bottom: 12px;
+}
+.seg {
+  min-height: 46px; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 700;
+  background: none; border: none; color: var(--gray); transition: background .15s, color .15s;
+}
+.seg.active { background: rgba(79,195,247,.16); color: var(--cyan); }
+
+/* ── Zufallsort ────────────────────────────────────────────────────────── */
+.dice { font-size: 18px; letter-spacing: .3px; }
+.dice:disabled { opacity: .6; }
+.world-info {
+  margin-top: 12px; padding: 12px; border-radius: 12px;
+  background: rgba(0,0,0,.28); border: 1px solid var(--border);
+}
+.world-info code { font-size: 15px; }
+.world-info .world-meta { margin-top: 5px; font-size: 12.5px; color: var(--gray); }
+.world-filters { margin-top: 14px; }
+.field.compact { margin-bottom: 8px; }
+.field.compact > span { font-size: 13px; }
+.type-chip.sel { background: rgba(79,195,247,.16); border-color: rgba(79,195,247,.5); color: var(--cyan); }
+button.type-chip { min-height: 42px; }
+.progress { height: 6px; border-radius: 4px; background: rgba(0,0,0,.35); overflow: hidden; margin-top: 10px; }
+.progress > div { height: 100%; width: 0; background: var(--cyan); transition: width .2s; }
+
+/* ── Kopieren ──────────────────────────────────────────────────────────── */
+.target-coords.copied { border-color: var(--green); background: rgba(76,217,138,.12); }
+.target-coords.copied .copy-hint { color: var(--green); }
+.copy-btn {
+  flex: 0 0 auto; min-width: 44px; min-height: 40px; border-radius: 10px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--cyan); font-size: 15px;
+}
+.copy-btn.copied { color: var(--green); border-color: rgba(76,217,138,.5); }

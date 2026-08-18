@@ -38,11 +38,8 @@
     return out;
   }
 
-  /* Minen im Umkreis laden. Gibt immer ein Ergebnis zurueck oder wirft
-     einen Fehler mit deutscher Meldung. */
-  function fetchMines(lat, lng, radiusM, force) {
-    radiusM = Math.min(radiusM || 800, MAX_RADIUS_M);
-    var bbox = util.bboxFromRadius(lat, lng, radiusM);
+  /* Kern: Minen in einer Bounding-Box laden. */
+  function fetchMinesInBounds(bbox, meta, force) {
     var key = bboxKey(bbox);
     var now = Date.now();
 
@@ -67,8 +64,11 @@
         var result = {
           mines: normalize(data.properties),
           truncated: !!data.truncated,
-          center: { lat: lat, lng: lng },
-          radiusM: radiusM,
+          center: (meta && meta.center) || {
+            lat: (bbox.minLat + bbox.maxLat) / 2,
+            lng: (bbox.minLng + bbox.maxLng) / 2
+          },
+          radiusM: (meta && meta.radiusM) || null,
           bbox: bbox,
           fetchedAt: Date.now()
         };
@@ -83,6 +83,13 @@
           'Pruefe die Internetverbindung — die Daten kommen live von terramine.app.');
       })
       .finally(function () { if (inflight === ctrl) inflight = null; });
+  }
+
+  /* Minen im Umkreis eines Punktes laden. */
+  function fetchMines(lat, lng, radiusM, force) {
+    radiusM = Math.min(radiusM || 800, MAX_RADIUS_M);
+    var bbox = util.bboxFromRadius(lat, lng, radiusM);
+    return fetchMinesInBounds(bbox, { center: { lat: lat, lng: lng }, radiusM: radiusM }, force);
   }
 
   /* Letzten Abruf lokal sichern, damit die App bei schlechtem Empfang
@@ -106,25 +113,94 @@
     } catch (e) { return null; }
   }
 
-  /* Weltweiter Dichte-Cache — nur auf Wunsch laden, ~3,6 MB. */
-  function fetchWorldCells() {
-    return fetch(HEATMAP_URL)
-      .then(function (res) {
-        if (!res.ok) throw new Error('Server antwortete mit ' + res.status);
-        return res.json();
-      })
-      .then(function (d) {
-        return {
-          cells: d.cells || [],
-          generatedAt: d.generatedAt,
-          totalProperties: d.totalProperties,
-          totalsByType: d.totalsByType
-        };
-      });
+  /* Weltweiter Dichte-Cache (~3,6 MB) — einmal laden, 24 h lokal behalten.
+     opts: { force, onProgress(geladenBytes, gesamtBytes) } */
+  var WORLD_CACHE = 'owner-radar-world-v1';
+  var WORLD_TS_KEY = 'terramine-owner-radar:worldts';
+  var WORLD_TTL = 24 * 3600000;
+  var worldMemory = null;
+
+  function worldAge() {
+    try { return Date.now() - (parseInt(localStorage.getItem(WORLD_TS_KEY), 10) || 0); }
+    catch (e) { return Infinity; }
+  }
+
+  function hasWorldCache() {
+    return !!worldMemory || worldAge() < WORLD_TTL;
+  }
+
+  function parseWorld(json) {
+    return {
+      cells: json.cells || [],
+      generatedAt: json.generatedAt,
+      totalProperties: json.totalProperties,
+      totalsByType: json.totalsByType,
+      cellSizeDegrees: json.cellSizeDegrees || 0.02
+    };
+  }
+
+  function fetchWorldCells(opts) {
+    opts = opts || {};
+    if (worldMemory && !opts.force) return Promise.resolve(worldMemory);
+
+    var fromCache = (!opts.force && typeof caches !== 'undefined' && worldAge() < WORLD_TTL)
+      ? caches.open(WORLD_CACHE).then(function (c) { return c.match(HEATMAP_URL); })
+          .then(function (hit) { return hit ? hit.json() : null; })
+          .catch(function () { return null; })
+      : Promise.resolve(null);
+
+    return fromCache.then(function (cached) {
+      if (cached) {
+        worldMemory = parseWorld(cached);
+        return worldMemory;
+      }
+      return downloadWorld(opts.onProgress);
+    });
+  }
+
+  function downloadWorld(onProgress) {
+    return fetch(HEATMAP_URL).then(function (res) {
+      if (!res.ok) throw new Error('Server antwortete mit ' + res.status);
+      var total = parseInt(res.headers.get('content-length'), 10) || 0;
+
+      // Ohne Stream-Unterstuetzung einfach normal einlesen.
+      if (!res.body || !res.body.getReader || !onProgress) return res.text();
+
+      var reader = res.body.getReader();
+      var chunks = [], loaded = 0;
+      return (function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) {
+            var all = new Uint8Array(loaded), at = 0;
+            chunks.forEach(function (ch) { all.set(ch, at); at += ch.length; });
+            return new TextDecoder('utf-8').decode(all);
+          }
+          chunks.push(r.value);
+          loaded += r.value.length;
+          onProgress(loaded, total);
+          return pump();
+        });
+      })();
+    }).then(function (text) {
+      var json = JSON.parse(text);
+      worldMemory = parseWorld(json);
+      try {
+        localStorage.setItem(WORLD_TS_KEY, String(Date.now()));
+        if (typeof caches !== 'undefined') {
+          caches.open(WORLD_CACHE).then(function (c) {
+            c.put(HEATMAP_URL, new Response(text, { headers: { 'Content-Type': 'application/json' } }));
+          }).catch(function () {});
+        }
+      } catch (e) { /* privater Modus / Quota */ }
+      return worldMemory;
+    }).catch(function (err) {
+      throw new Error('Weltdaten konnten nicht geladen werden (' + (err.message || err) + ').');
+    });
   }
 
   return {
-    fetchMines: fetchMines, fetchWorldCells: fetchWorldCells,
+    fetchMines: fetchMines, fetchMinesInBounds: fetchMinesInBounds,
+    fetchWorldCells: fetchWorldCells, hasWorldCache: hasWorldCache,
     loadCache: loadCache, MAX_RADIUS_M: MAX_RADIUS_M,
     VIEWPORT_URL: VIEWPORT_URL, HEATMAP_URL: HEATMAP_URL
   };
