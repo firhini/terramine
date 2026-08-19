@@ -1,10 +1,10 @@
 /* Service Worker: App-Huelle offline verfuegbar halten.
    Minen-Daten kommen immer live aus dem Netz (nie aus diesem Cache). */
-const CACHE = 'owner-radar-v2';
+const CACHE = 'owner-radar-v3';
 const SHELL = [
   './', './index.html',
   './assets/css/app.css',
-  './assets/js/util.js', './assets/js/cluster.js', './assets/js/world.js', './assets/js/store.js',
+  './assets/js/i18n.js', './assets/js/util.js', './assets/js/cluster.js', './assets/js/world.js', './assets/js/store.js',
   './assets/js/api.js', './assets/js/app.js',
   './manifest.webmanifest', './assets/icon.svg'
 ];

@@ -179,7 +179,7 @@ input[type=checkbox] { accent-color: var(--cyan); width: 17px; height: 17px; }
 /* ── Listen ────────────────────────────────────────────────────────────── */
 .target-list { list-style: none; }
 .target-list li {
-  display: flex; align-items: center; gap: 10px; padding: 10px 0;
+  display: flex; align-items: center; gap: 8px; padding: 10px 0;
   border-top: 1px solid var(--border); cursor: pointer;
 }
 .target-list li:first-child { border-top: none; }
@@ -188,7 +188,7 @@ input[type=checkbox] { accent-color: var(--cyan); width: 17px; height: 17px; }
   background: var(--surface-2); font-size: 12px; color: var(--gray);
 }
 .target-list .info { flex: 1; min-width: 0; }
-.target-list .info b { display: block; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.target-list .info b { display: block; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; white-space: nowrap; }
 .target-list .info span { font-size: 12px; color: var(--gray); }
 .target-list .dist { font-size: 13px; color: var(--cyan); white-space: nowrap; text-align: right; }
 .target-list .dist small { display: block; color: var(--gray); font-size: 11px; }
@@ -327,7 +327,7 @@ button.type-chip { min-height: 42px; }
 .target-coords.copied { border-color: var(--green); background: rgba(76,217,138,.12); }
 .target-coords.copied .copy-hint { color: var(--green); }
 .copy-btn {
-  flex: 0 0 auto; min-width: 44px; min-height: 40px; border-radius: 10px; cursor: pointer;
+  flex: 0 0 auto; min-width: 40px; min-height: 40px; border-radius: 10px; cursor: pointer;
   background: var(--surface-2); border: 1px solid var(--border); color: var(--cyan); font-size: 15px;
 }
 .copy-btn.copied { color: var(--green); border-color: rgba(76,217,138,.5); }

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Owner Radar — TerraMine Check-in Tracker</title>
-<meta name="description" content="Findet die naechste TerraMine-Mine eines Owners, bei dem du in den letzten 24 Stunden nicht eingecheckt hast — mit exakten Koordinaten und Cooldown-Verwaltung." />
+<title>Owner Radar — TerraMine check-in tracker</title>
+<meta name="description" content="Finds the next TerraMine mine of an owner you have not checked in with for 24 hours — with exact coordinates, worldwide random spots and cooldown tracking." />
 <meta name="theme-color" content="#0D1B2A" />
 <meta name="color-scheme" content="dark" />
 <link rel="manifest" href="manifest.webmanifest" />
@@ -23,16 +23,17 @@
     <span class="brand-text">Owner<span>Radar</span></span>
   </div>
   <div class="topbar-right">
-    <button id="btn-undo" class="icon-btn" hidden title="Letzte Aktion rueckgaengig">↺</button>
-    <button id="btn-refresh" class="icon-btn" title="Minen neu laden">⟳</button>
+    <button id="btn-lang" class="icon-btn lang" data-i18n-title="header.language">DE</button>
+    <button id="btn-undo" class="icon-btn" hidden data-i18n-title="header.undo">↺</button>
+    <button id="btn-refresh" class="icon-btn" data-i18n-title="header.refresh">⟳</button>
   </div>
 </header>
 
 <div class="statusbar" id="statusbar">
-  <span class="chip" id="chip-gps">📍 kein Standort</span>
-  <span class="chip" id="chip-mines">⛏ 0 Minen</span>
-  <span class="chip" id="chip-groups">👥 0 Gruppen</span>
-  <span class="chip" id="chip-age">⟳ –</span>
+  <span class="chip" id="chip-gps"></span>
+  <span class="chip" id="chip-mines"></span>
+  <span class="chip" id="chip-groups"></span>
+  <span class="chip" id="chip-age"></span>
 </div>
 
 <main>
@@ -41,58 +42,58 @@
   <section class="view" id="view-radar">
 
     <div class="segmented" id="mode-switch">
-      <button class="seg active" data-mode="near">📍 Umkreis</button>
-      <button class="seg" data-mode="world">🎲 Weltweit</button>
+      <button class="seg active" data-mode="near" data-i18n="mode.near"></button>
+      <button class="seg" data-mode="world" data-i18n="mode.world"></button>
     </div>
 
     <div class="card location-card" id="card-near">
       <div class="card-head">
-        <h2>Standort</h2>
-        <button id="btn-locate" class="btn small">GPS</button>
+        <h2 data-i18n="loc.title"></h2>
+        <button id="btn-locate" class="btn small" data-i18n="loc.gps"></button>
       </div>
       <div class="coord-row">
         <code id="my-coords">–</code>
         <span class="muted" id="my-accuracy"></span>
       </div>
-      <button class="link-btn" id="btn-manual-toggle">Koordinaten von Hand eingeben</button>
+      <button class="link-btn" id="btn-manual-toggle" data-i18n="loc.manualToggle"></button>
       <div id="manual-box" hidden>
         <div class="row gap" style="margin-top:8px">
-          <input id="input-manual" type="text" inputmode="decimal" placeholder="52.52000, 13.40500" />
-          <button id="btn-manual" class="btn small ghost">setzen</button>
+          <input id="input-manual" type="text" inputmode="decimal" data-i18n-ph="loc.placeholder" />
+          <button id="btn-manual" class="btn small ghost" data-i18n="loc.set"></button>
         </div>
       </div>
       <label class="switch-row">
-        <input type="checkbox" id="chk-follow" /> <span>Standort laufend verfolgen</span>
+        <input type="checkbox" id="chk-follow" /> <span data-i18n="loc.follow"></span>
       </label>
     </div>
 
     <div class="card world-card" id="card-world" hidden>
       <div class="card-head">
-        <h2>Zufallsort</h2>
+        <h2 data-i18n="world.title"></h2>
         <span class="muted" id="world-status"></span>
       </div>
 
-      <button class="btn big block dice" id="btn-dice">🎲 Zufallsort weltweit</button>
+      <button class="btn big block dice" id="btn-dice"></button>
 
       <div id="world-info" class="world-info" hidden></div>
 
-      <button class="link-btn" id="btn-world-filters">⚙ Filter &amp; Optionen</button>
+      <button class="link-btn" id="btn-world-filters" data-i18n="world.filters"></button>
       <div class="world-filters" id="world-filters" hidden>
         <label class="field compact">
-          <span>Mindestens <b id="lbl-world-min">10</b> Minen vor Ort</span>
+          <span id="lbl-world-min"></span>
           <input type="range" id="rng-world-min" min="1" max="120" step="1" />
         </label>
         <div class="type-filters" id="world-type-filters">
-          <button class="type-chip sel" data-wtype="any">alle</button>
-          <button class="type-chip" data-wtype="coal">⚫ Kohle</button>
-          <button class="type-chip" data-wtype="gold">⭐ Gold</button>
-          <button class="type-chip" data-wtype="diamond">💎 Diamant</button>
+          <button class="type-chip sel" data-wtype="any" data-i18n="world.typeAny"></button>
+          <button class="type-chip" data-wtype="coal" data-i18n="world.typeCoal"></button>
+          <button class="type-chip" data-wtype="gold" data-i18n="world.typeGold"></button>
+          <button class="type-chip" data-wtype="diamond" data-i18n="world.typeDiamond"></button>
         </div>
         <div class="row gap wrap" style="margin-top:10px">
-          <button class="btn small ghost" id="btn-world-map">Auf Karte zeigen</button>
-          <button class="btn small ghost" id="btn-world-reset">Besuchte Orte zuruecksetzen</button>
+          <button class="btn small ghost" id="btn-world-map" data-i18n="world.showOnMap"></button>
+          <button class="btn small ghost" id="btn-world-reset" data-i18n="world.resetVisited"></button>
         </div>
-        <p class="hint" id="world-hint">Weltdaten werden beim ersten Wuerfeln geladen (einmalig ca. 3,6 MB, danach 24 h lokal gespeichert).</p>
+        <p class="hint" id="world-hint" data-i18n="world.hint"></p>
       </div>
     </div>
 
@@ -100,20 +101,19 @@
 
     <div class="card streak-card">
       <div class="card-head">
-        <h2>Heute</h2>
-        <span class="muted" id="streak-count">0 Check-ins</span>
+        <h2 data-i18n="today.title"></h2>
+        <span class="muted" id="streak-count"></span>
       </div>
       <div class="streak-bar"><div class="streak-fill" id="streak-fill"></div></div>
-      <p class="streak-text" id="streak-text">Noch keine Check-ins heute.</p>
+      <p class="streak-text" id="streak-text"></p>
     </div>
-
 
     <div class="card" id="next-card">
       <div class="card-head">
-        <h2>Weitere Ziele</h2>
+        <h2 data-i18n="list.title"></h2>
         <div class="head-actions">
           <span class="muted" id="next-count"></span>
-          <button class="link-btn" id="btn-order">Reihenfolge</button>
+          <button class="link-btn" id="btn-order"></button>
         </div>
       </div>
       <ol class="target-list" id="target-list"></ol>
@@ -121,7 +121,7 @@
 
     <div class="card" id="cooldown-card">
       <div class="card-head">
-        <h2>Im Cooldown</h2>
+        <h2 data-i18n="cooldown.title"></h2>
         <span class="muted" id="cooldown-count"></span>
       </div>
       <ul class="mini-list" id="cooldown-list"></ul>
@@ -129,97 +129,105 @@
 
   </section>
 
-  <!-- ── KARTE ─────────────────────────────────────────────────────────── -->
+  <!-- ── MAP ───────────────────────────────────────────────────────────── -->
   <section class="view" id="view-map" hidden>
     <div class="map-wrap">
       <div id="map"></div>
       <div class="map-legend">
-        <span><i class="dot free"></i>frei</span>
-        <span><i class="dot cool"></i>Cooldown</span>
-        <span><i class="dot blocked"></i>gesperrt</span>
-        <span><i class="dot me"></i>du</span>
+        <span><i class="dot free"></i><span data-i18n="map.legendFree"></span></span>
+        <span><i class="dot cool"></i><span data-i18n="map.legendCool"></span></span>
+        <span><i class="dot blocked"></i><span data-i18n="map.legendBlocked"></span></span>
+        <span><i class="dot me"></i><span data-i18n="map.legendMe"></span></span>
       </div>
-      <button id="btn-search-here" class="btn map-btn">Hier suchen</button>
+      <button id="btn-search-here" class="btn map-btn" data-i18n="map.searchHere"></button>
     </div>
-    <p class="hint" id="map-hint">Tippe eine Mine an: Ziel setzen, Check-in buchen oder sperren.</p>
+    <p class="hint" id="map-hint" data-i18n="map.hint"></p>
   </section>
 
-  <!-- ── OWNER ─────────────────────────────────────────────────────────── -->
+  <!-- ── OWNERS ────────────────────────────────────────────────────────── -->
   <section class="view" id="view-owners" hidden>
     <div class="card">
       <div class="card-head">
-        <h2>Owner</h2>
+        <h2 data-i18n="owners.title"></h2>
         <span class="muted" id="owner-summary"></span>
       </div>
-      <p class="hint">Ein Eintrag pro Owner. Vergib beim Abhaken den Namen aus dem Spiel — dann teilen sich alle Blocks dieses Owners denselben Cooldown.</p>
+      <p class="hint" data-i18n="owners.hint"></p>
       <ul class="owner-list" id="owner-list"></ul>
     </div>
   </section>
 
-  <!-- ── MEHR ──────────────────────────────────────────────────────────── -->
+  <!-- ── MORE ──────────────────────────────────────────────────────────── -->
   <section class="view" id="view-more" hidden>
 
     <div class="card">
-      <div class="card-head"><h2>Einstellungen</h2></div>
+      <div class="card-head"><h2 data-i18n="settings.language"></h2></div>
+      <div class="segmented" id="lang-switch">
+        <button class="seg" data-lang="en">🇬🇧 English</button>
+        <button class="seg" data-lang="de">🇩🇪 Deutsch</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 data-i18n="settings.title"></h2></div>
 
       <label class="field">
-        <span>Suchradius <b id="lbl-radius">800 m</b></span>
+        <span><span data-i18n="settings.radius"></span> <b id="lbl-radius"></b></span>
         <input type="range" id="rng-radius" min="200" max="5000" step="100" />
       </label>
 
       <label class="field">
-        <span>Cooldown pro Owner <b id="lbl-cooldown">24 h</b></span>
+        <span><span data-i18n="settings.cooldown"></span> <b id="lbl-cooldown"></b></span>
         <input type="range" id="rng-cooldown" min="1" max="48" step="1" />
       </label>
 
       <label class="field">
-        <span>Blockabstand <b id="lbl-link">25 m</b></span>
+        <span><span data-i18n="settings.link"></span> <b id="lbl-link"></b></span>
         <input type="range" id="rng-link" min="10" max="80" step="5" />
-        <small class="muted">Wie weit zwei Felder auseinanderliegen duerfen, damit sie noch als Block eines Owners gelten.</small>
+        <small class="muted" data-i18n="settings.linkHint"></small>
       </label>
 
       <div class="field">
-        <span>Minentypen</span>
+        <span data-i18n="settings.types"></span>
         <div class="type-filters">
-          <label class="type-chip"><input type="checkbox" data-type="rock" checked /><span>🪨 Stein</span></label>
-          <label class="type-chip"><input type="checkbox" data-type="coal" checked /><span>⚫ Kohle</span></label>
-          <label class="type-chip"><input type="checkbox" data-type="gold" checked /><span>⭐ Gold</span></label>
-          <label class="type-chip"><input type="checkbox" data-type="diamond" checked /><span>💎 Diamant</span></label>
+          <label class="type-chip"><input type="checkbox" data-type="rock" checked /><span data-i18n="settings.rock"></span></label>
+          <label class="type-chip"><input type="checkbox" data-type="coal" checked /><span data-i18n="settings.coal"></span></label>
+          <label class="type-chip"><input type="checkbox" data-type="gold" checked /><span data-i18n="settings.gold"></span></label>
+          <label class="type-chip"><input type="checkbox" data-type="diamond" checked /><span data-i18n="settings.diamond"></span></label>
         </div>
       </div>
 
       <label class="switch-row">
-        <input type="checkbox" id="chk-rare" /> <span>Seltene Minen bevorzugen (kleiner Umweg erlaubt)</span>
+        <input type="checkbox" id="chk-rare" /> <span data-i18n="settings.rare"></span>
       </label>
     </div>
 
     <div class="card">
       <div class="card-head">
-        <h2>Verlauf</h2>
+        <h2 data-i18n="history.title"></h2>
         <span class="muted" id="history-count"></span>
       </div>
       <ul class="mini-list" id="history-list"></ul>
     </div>
 
     <div class="card">
-      <div class="card-head"><h2>Daten</h2></div>
-      <p class="hint">Alles liegt nur in diesem Browser. Sicherung exportieren, bevor du den Browser-Speicher leerst oder das Geraet wechselst.</p>
+      <div class="card-head"><h2 data-i18n="settings.data"></h2></div>
+      <p class="hint" data-i18n="settings.dataHint"></p>
       <div class="row gap wrap">
-        <button id="btn-export" class="btn small">Export (.json)</button>
-        <button id="btn-import" class="btn small ghost">Import</button>
-        <button id="btn-reset" class="btn small danger">Alles loeschen</button>
+        <button id="btn-export" class="btn small" data-i18n="settings.export"></button>
+        <button id="btn-import" class="btn small ghost" data-i18n="settings.import"></button>
+        <button id="btn-reset" class="btn small danger" data-i18n="settings.reset"></button>
       </div>
       <input type="file" id="file-import" accept="application/json,.json" hidden />
     </div>
 
     <div class="card">
-      <div class="card-head"><h2>So funktioniert es</h2></div>
+      <div class="card-head"><h2 data-i18n="how.title"></h2></div>
       <div class="prose">
-        <p><b>Datenquelle:</b> die Minen kommen live von den oeffentlichen TerraMine-Endpunkten, die auch die offizielle Weltkarte nutzt. Abgefragt wird immer nur dein Umkreis, nie der ganze Datensatz.</p>
-        <p><b>Owner-Erkennung:</b> die API gibt keine Owner-IDs heraus. Zusammenhaengende Felderbloecke werden deshalb als <i>ein</i> Owner behandelt — so bauen Spieler ihre TerraAcres praktisch immer. Sobald du beim Abhaken einen Namen eintraegst, zaehlt der Name: alle Blocks dieses Owners teilen sich dann einen Cooldown.</p>
-        <p><b>Cooldown:</b> nach dem Abhaken verschwindet der Owner fuer 24 Stunden (einstellbar) aus den Vorschlaegen. Vorgeschlagen wird immer nur ein Ziel pro Owner, sortiert nach Laufweg.</p>
-        <p><b>Sonderfall dichter Block:</b> gehoert ein zusammenhaengender Block mehreren Ownern, markiere ihn beim Ziel als „mehrere Owner“ — dann sperrt ein Check-in nur die 30 m rundherum statt des ganzen Blocks.</p>
-        <p><b>Check-in im Spiel:</b> der Check-in passiert weiter in der TerraMine-App vor Ort (GPS-Naehe). Dieses Tool plant nur die Runde und merkt sich, wen du schon hattest.</p>
+        <p data-i18n-html="how.p1"></p>
+        <p data-i18n-html="how.p2"></p>
+        <p data-i18n-html="how.p3"></p>
+        <p data-i18n-html="how.p4"></p>
+        <p data-i18n-html="how.p5"></p>
       </div>
     </div>
 
@@ -227,22 +235,23 @@
 </main>
 
 <nav class="tabbar">
-  <button class="tab active" data-view="radar"><span>🎯</span>Radar</button>
-  <button class="tab" data-view="map"><span>🗺</span>Karte</button>
-  <button class="tab" data-view="owners"><span>👥</span>Owner</button>
-  <button class="tab" data-view="more"><span>⚙</span>Mehr</button>
+  <button class="tab active" data-view="radar"><span>🎯</span><span data-i18n="nav.radar"></span></button>
+  <button class="tab" data-view="map"><span>🗺</span><span data-i18n="nav.map"></span></button>
+  <button class="tab" data-view="owners"><span>👥</span><span data-i18n="nav.owners"></span></button>
+  <button class="tab" data-view="more"><span>⚙</span><span data-i18n="nav.more"></span></button>
 </nav>
 
-<!-- Check-in-Dialog -->
+<!-- check-in / block / download sheet -->
 <div class="sheet-backdrop" id="sheet-backdrop" hidden>
   <div class="sheet" id="sheet">
-    <h3 id="sheet-title">Check-in buchen</h3>
+    <h3 id="sheet-title"></h3>
     <div id="sheet-body"></div>
   </div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
 
+<script src="assets/js/i18n.js"></script>
 <script src="assets/js/util.js"></script>
 <script src="assets/js/cluster.js"></script>
 <script src="assets/js/world.js"></script>

@@ -69,7 +69,7 @@ test('parseLatLng akzeptiert gaengige Schreibweisen', () => {
 });
 
 test('fmtDuration rundet auf und bleibt lesbar', () => {
-  assert.equal(util.fmtDuration(0), 'jetzt');
+  assert.equal(util.fmtDuration(0), 'now');
   assert.equal(util.fmtDuration(30 * 60000), '30 min');
   assert.equal(util.fmtDuration(7.2 * HOUR), '7 h 12 min');
   assert.equal(util.fmtDuration(24 * HOUR), '24 h');
@@ -77,7 +77,7 @@ test('fmtDuration rundet auf und bleibt lesbar', () => {
 
 test('compass zeigt in die richtige Richtung', () => {
   assert.equal(util.compass(util.bearing(52.52, 13.405, 52.53, 13.405)), 'N');
-  assert.equal(util.compass(util.bearing(52.52, 13.405, 52.52, 13.42)), 'O');
+  assert.equal(util.compass(util.bearing(52.52, 13.405, 52.52, 13.42)), 'E');
 });
 
 // ── cluster ─────────────────────────────────────────────────────────────────
@@ -401,7 +401,7 @@ test('Cooldown-Reset gibt einen Owner sofort wieder frei', () => {
 test('fmtDuration zeigt einen 24-h-Cooldown in Stunden statt Tagen', () => {
   assert.equal(util.fmtDuration(24 * HOUR), '24 h');
   assert.equal(util.fmtDuration(47 * HOUR), '47 h');
-  assert.equal(util.fmtDuration(50 * HOUR), '2 T 2 h');
+  assert.equal(util.fmtDuration(50 * HOUR), '2 d 2 h');
 });
 
 test('einzelner Check-in laesst sich nachtraeglich loeschen', () => {
@@ -457,11 +457,11 @@ test('Laufroute ist kuerzer als die Reihenfolge nach Luftlinie, wenn ein Umweg d
   assert.ok(route[route.length - 1].totalDistance <= naive + 0.001, 'Route ist nie laenger als die naive Reihenfolge');
 });
 
-test('fmtDist rundet und nutzt das deutsche Dezimalkomma', () => {
+test('fmtDist rundet und nutzt englische Schreibweise als Standard', () => {
   assert.equal(util.fmtDist(28.4), '28 m');
   assert.equal(util.fmtDist(999), '999 m');
-  assert.equal(util.fmtDist(2913), '2,91 km');
-  assert.equal(util.fmtDist(24500), '24,5 km');
+  assert.equal(util.fmtDist(2913), '2.91 km');
+  assert.equal(util.fmtDist(24500), '24.5 km');
 });
 
 test('Typfilter einzeln umschalten verliert die anderen Typen nicht', () => {
@@ -579,4 +579,77 @@ test('Weltmodus-Einstellungen ueberleben einen Neustart', () => {
   assert.equal(s2.settings().mode, 'world');
   assert.equal(s2.settings().worldMinMines, 25);
   assert.equal(s2.settings().worldRequireType, 'diamond');
+});
+
+// ── Sprachen ────────────────────────────────────────────────────────────────
+const i18n = require(path.join(__dirname, '../assets/js/i18n.js'));
+const fs = require('fs');
+
+test('Englisch ist die Standardsprache', () => {
+  assert.equal(i18n.DEFAULT, 'en');
+  assert.equal(i18n.lang(), 'en');
+  assert.equal(i18n.t('nav.owners'), 'Owners');
+});
+
+test('beide Sprachen haben genau dieselben Schluessel', () => {
+  const en = Object.keys(i18n.STRINGS.en).sort();
+  const de = Object.keys(i18n.STRINGS.de).sort();
+  assert.deepEqual(en, de);
+  assert.ok(en.length > 200, `nur ${en.length} Schluessel`);
+});
+
+test('keine Uebersetzung ist leer oder unveraendert kopiert', () => {
+  // In beiden Sprachen bewusst identisch (Eigennamen, Symbole, gleiche Woerter).
+  const same = new Set(['nav.radar', 'chip.gps', 'loc.gps', 'loc.placeholder', 'world.typeGold',
+    'list.orderRoute', 'owners.in', 'owners.rename', 'settings.gold', 'settings.export',
+    'settings.import', 'settings.cooldownSet', 'map.popupRoute', 'toast.copied']);
+  for (const key of Object.keys(i18n.STRINGS.en)) {
+    assert.ok(i18n.STRINGS.en[key].trim(), `EN leer: ${key}`);
+    assert.ok(i18n.STRINGS.de[key].trim(), `DE leer: ${key}`);
+    if (!same.has(key)) {
+      assert.notEqual(i18n.STRINGS.de[key], i18n.STRINGS.en[key], `DE nicht uebersetzt: ${key}`);
+    }
+  }
+});
+
+test('Platzhalter stimmen in beiden Sprachen ueberein', () => {
+  const ph = s => (s.match(/\{\w+\}/g) || []).sort().join(',');
+  for (const key of Object.keys(i18n.STRINGS.en)) {
+    assert.equal(ph(i18n.STRINGS.de[key]), ph(i18n.STRINGS.en[key]), `Platzhalter weichen ab: ${key}`);
+  }
+});
+
+test('jeder im Code benutzte Schluessel existiert im Woerterbuch', () => {
+  const appSrc = fs.readFileSync(path.join(__dirname, '../assets/js/app.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const used = new Set();
+  for (const m of appSrc.matchAll(/\bt\('([a-zA-Z0-9_.]+)'/g)) used.add(m[1]);
+  for (const m of html.matchAll(/data-i18n(?:-html|-ph|-title)?="([a-zA-Z0-9_.]+)"/g)) used.add(m[1]);
+  assert.ok(used.size > 80, `nur ${used.size} Schluessel im Code gefunden`);
+  const missing = [...used].filter(k => !(k in i18n.STRINGS.en));
+  assert.deepEqual(missing, [], 'unbekannte Schluessel: ' + missing.join(', '));
+});
+
+test('Umschalten wirkt auf Texte und Formate', () => {
+  i18n.setLang('de');
+  assert.equal(i18n.t('nav.owners'), 'Owner');
+  assert.equal(util.fmtDist(2913), '2,91 km');
+  assert.equal(util.compass(90), 'O');
+  i18n.setLang('en');
+  assert.equal(i18n.t('nav.owners'), 'Owners');
+  assert.equal(util.fmtDist(2913), '2.91 km');
+  assert.equal(util.compass(90), 'E');
+});
+
+test('Platzhalter werden ersetzt, unbekannte Schluessel bleiben sichtbar', () => {
+  assert.equal(i18n.t('list.fields', { n: 7 }), '7 tiles');
+  assert.equal(i18n.t('cooldown.freeIn', { t: '3 h' }), 'free in 3 h');
+  assert.equal(i18n.t('gibt.es.nicht'), 'gibt.es.nicht');
+});
+
+test('das Markup enthaelt keinen fest verdrahteten deutschen Text', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '');
+  const german = html.match(/>[^<>{}]*\b(Owner-Name|Minen|Zufallsort|Koordinaten|Einstellungen|Karte|Standort)\b[^<>]*</g) || [];
+  assert.deepEqual(german, [], 'deutscher Text im Markup: ' + german.join(' | '));
 });

@@ -165,7 +165,7 @@
       var trimmed = String(name || '').trim();
       if (!trimmed) return o;
       var existing = findOwnerByName(trimmed);
-      pushUndo('Owner umbenannt');
+      pushUndo({ key: 'undo.rename' });
       if (existing && existing.key !== k) {
         mergeInto(existing.key, k);
         save(); emit();
@@ -192,14 +192,14 @@
     }
 
     function mergeOwners(intoKey, fromKey) {
-      pushUndo('Owner zusammengefuehrt');
+      pushUndo({ key: 'undo.merge' });
       mergeInto(intoKey, fromKey);
       save(); emit();
     }
 
     function deleteOwner(k) {
       if (!owner(k)) return;
-      pushUndo('Owner geloescht');
+      pushUndo({ key: 'undo.deleteOwner' });
       Object.keys(state.mines).forEach(function (mid) {
         if (state.mines[mid].owner === k) state.mines[mid].owner = null;
       });
@@ -211,7 +211,7 @@
     function resetOwnerCooldown(k) {
       var o = owner(k);
       if (!o) return;
-      pushUndo('Cooldown zurueckgesetzt');
+      pushUndo({ key: 'undo.resetCooldown' });
       o.lastCheckInAt = 0;
       save(); emit();
     }
@@ -225,7 +225,7 @@
     }
 
     function blockMine(id, days, type) {
-      pushUndo('Mine gesperrt');
+      pushUndo({ key: 'undo.blockMine' });
       var m = ensureMine(id, type);
       m.blockedUntil = days && days > 0 ? Date.now() + days * 86400000 : FOREVER;
       save(); emit();
@@ -234,7 +234,7 @@
     function unblockMine(id) {
       var m = state.mines[id];
       if (!m) return;
-      pushUndo('Sperre aufgehoben');
+      pushUndo({ key: 'undo.unblockMine' });
       m.blockedUntil = 0;
       save(); emit();
     }
@@ -247,13 +247,13 @@
     }
 
     function setMultiOwner(gid, on) {
-      pushUndo(on ? 'Als Mehr-Owner-Block markiert' : 'Mehr-Owner-Markierung entfernt');
+      pushUndo({ key: 'undo.multiOwner' });
       ensureGroup(gid).multiOwner = !!on;
       save(); emit();
     }
 
     function snoozeGroup(gid, hours) {
-      pushUndo('Gruppe uebersprungen');
+      pushUndo({ key: 'undo.snooze' });
       ensureGroup(gid).snoozeUntil = Date.now() + (hours || state.settings.skipHours) * 3600000;
       save(); emit();
     }
@@ -426,7 +426,7 @@
       now = now || Date.now();
       var mine = opts.mine, group = opts.group, name = opts.ownerName;
       if (!mine) return null;
-      pushUndo('Check-in bei ' + (name || 'Mine ' + mine.id));
+      pushUndo({ key: 'undo.checkin', params: { name: name || null, mineId: mine.id } });
 
       var g = group ? state.groups[group.id] : null;
       var multi = !!(g && g.multiOwner);
@@ -479,7 +479,7 @@
     function deleteCheckIn(index) {
       var entry = state.checkIns[index];
       if (!entry) return false;
-      pushUndo('Check-in geloescht');
+      pushUndo({ key: 'undo.deleteCheckin' });
       state.checkIns.splice(index, 1);
 
       var o = owner(entry.owner);
@@ -517,7 +517,7 @@
     }
 
     function clearVisitedCells() {
-      pushUndo('Zufallsorte zurueckgesetzt');
+      pushUndo({ key: 'undo.clearVisited' });
       state.worldVisited = {};
       save(); emit();
     }
@@ -550,7 +550,7 @@
 
     function importJson(text, mode) {
       var incoming = migrate(JSON.parse(text));
-      pushUndo('Daten importiert');
+      pushUndo({ key: 'undo.import' });
       if (mode === 'replace') {
         state = incoming;
       } else {
@@ -602,7 +602,7 @@
     }
 
     function reset() {
-      pushUndo('Alles zurueckgesetzt');
+      pushUndo({ key: 'undo.reset' });
       state = defaults();
       save(); emit();
     }

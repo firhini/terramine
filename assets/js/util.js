@@ -33,8 +33,16 @@
     return (toDeg(Math.atan2(y, x)) + 360) % 360;
   }
 
-  var COMPASS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
-  function compass(deg) { return COMPASS[Math.round(((deg % 360) + 360) % 360 / 45) % 8]; }
+  /* Sprache wirkt auf Himmelsrichtungen, Dezimaltrennzeichen und Datum. */
+  var locale = 'en';
+  function setLocale(l) { locale = l === 'de' ? 'de' : 'en'; return locale; }
+  function getLocale() { return locale; }
+
+  var COMPASS = {
+    en: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+    de: ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW']
+  };
+  function compass(deg) { return COMPASS[locale][Math.round(((deg % 360) + 360) % 360 / 45) % 8]; }
 
   /* Bounding-Box um einen Punkt mit Radius in Metern. */
   function bboxFromRadius(lat, lng, radiusM) {
@@ -76,23 +84,25 @@
   function fmtDist(m) {
     if (!isFinite(m)) return '–';
     if (m < 1000) return Math.round(m) + ' m';
-    return (m / 1000).toFixed(m < 10000 ? 2 : 1).replace('.', ',') + ' km';   // deutsches Dezimalkomma
+    var km = (m / 1000).toFixed(m < 10000 ? 2 : 1);
+    return (locale === 'de' ? km.replace('.', ',') : km) + ' km';
   }
 
   /* Restdauer als "7 h 12 min" / "43 min" / "jetzt". */
   function fmtDuration(ms) {
-    if (!isFinite(ms) || ms <= 0) return 'jetzt';
+    if (!isFinite(ms) || ms <= 0) return locale === 'de' ? 'jetzt' : 'now';
     var min = Math.ceil(ms / 60000);
     if (min < 60) return min + ' min';
     var h = Math.floor(min / 60), rest = min % 60;
     if (h < 48) return h + ' h' + (rest ? ' ' + rest + ' min' : '');
     var d = Math.floor(h / 24);
-    return d + ' T' + (h % 24 ? ' ' + (h % 24) + ' h' : '');
+    return d + (locale === 'de' ? ' T' : ' d') + (h % 24 ? ' ' + (h % 24) + ' h' : '');
   }
 
   function fmtClock(ts) {
     var d = new Date(ts);
-    return d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleString(locale === 'de' ? 'de-DE' : 'en-GB',
+      { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   }
 
   /* Beginn des lokalen Tages (fuer die Tages-Streak). */
@@ -116,6 +126,7 @@
   return {
     EARTH_R: EARTH_R, M_PER_DEG_LAT: M_PER_DEG_LAT, GRID_DEG: GRID_DEG,
     toRad: toRad, toDeg: toDeg, clamp: clamp,
+    setLocale: setLocale, getLocale: getLocale,
     distance: distance, bearing: bearing, compass: compass,
     bboxFromRadius: bboxFromRadius,
     mineId: mineId, parseMineId: parseMineId, parseLatLng: parseLatLng,

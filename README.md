@@ -1,139 +1,146 @@
-# Owner Radar — TerraMine Check-in Tracker
+# Owner Radar — TerraMine check-in tracker
 
-Findet die **nächste Mine eines Owners, bei dem du in den letzten 24 Stunden nicht eingecheckt hast** —
-mit exakten Koordinaten, Laufroute und Cooldown-Verwaltung. Reine statische Website, läuft direkt
-auf GitHub Pages, ohne Server und ohne Account.
+🇬🇧 English · [🇩🇪 Deutsch](README.de.md)
+
+Finds the **next mine of an owner you have not checked in with in the last 24 hours** — with exact
+coordinates, a walking route and cooldown tracking. A plain static site: runs straight from GitHub
+Pages, no server, no account, English and German interface.
 
 <p>
-  <img src=".github/preview-radar.png" alt="Radar mit naechstem Ziel, Laufroute und Cooldown" width="270" />
-  <img src=".github/preview-weltweit.png" alt="Zufallsort weltweit mit exakten Koordinaten" width="270" />
-  <img src=".github/preview-karte.png" alt="Karte mit freien und gesperrten Minen" width="270" />
+  <img src=".github/preview-radar.png" alt="Radar with next target, route and cooldown" width="270" />
+  <img src=".github/preview-world.png" alt="Worldwide random spot with exact coordinates" width="270" />
+  <img src=".github/preview-map.png" alt="Map with free and blocked mines" width="270" />
 </p>
 
-## Zwei Betriebsarten
+## Two modes
 
-| Modus | wofür |
+| Mode | what it is for |
 |---|---|
-| 📍 **Umkreis** | Ziele rund um deinen eigenen Standort — für die Runde vor der Haustür |
-| 🎲 **Weltweit** | ein zufälliger Ort irgendwo auf der Welt, per Knopfdruck neu gewürfelt |
+| 📍 **Nearby** | targets around your own location — for the round on your doorstep |
+| 🎲 **Worldwide** | a random spot anywhere in the world, re-rolled at the tap of a button |
 
-Beim Würfeln zieht die App eine beliebige Gegend aus der weltweiten Minen-Übersicht
-(rund 44.000 Gegenden, 800.000+ Minen), lädt dort die exakten Felder und zeigt sofort das
-nächste Ziel. Findet sich dort kein freier Owner, würfelt sie automatisch weiter — bis zu
-sechsmal. Über *Filter & Optionen* lässt sich einstellen, wie viele Minen mindestens vor Ort
-sein sollen und ob nur Gegenden **mit Diamant, Gold oder Kohle** gezogen werden.
-Besuchte Orte merkt sich die App und überspringt sie beim nächsten Wurf.
+Rolling picks a random area from the worldwide mine overview (about 44,000 areas, 800,000+ mines),
+loads the exact tiles there and shows the next target immediately. If no owner is free at that spot,
+it keeps rolling automatically — up to six times. Under *Filters & options* you can set how many
+mines must be on site and whether only areas **with diamond, gold or coal** are drawn. Visited spots
+are remembered and skipped on the next roll.
 
-## Was das Tool macht
+## What the tool does
 
-1. **Standort setzen** (GPS, Koordinaten eintippen — oder 🎲 würfeln).
-2. Es lädt live alle TerraAcres im Umkreis von den öffentlichen TerraMine-Endpunkten — denselben,
-   die auch die offizielle Weltkarte (`terramine.app/heatmap.html`) benutzt.
-3. Zusammenhängende Felderblöcke werden zu **Owner-Gruppen** zusammengefasst.
-4. Du bekommst **ein Ziel pro Owner** mit exakter Feldmitte auf 5 Nachkommastellen, Entfernung,
-   Himmelsrichtung und Navigations-Link. **Ein Tipp auf die Koordinaten kopiert sie** in die
-   Zwischenablage (mit sicht- und spürbarer Bestätigung); dieselbe Kopierfunktion gibt es in
-   jeder Zeile der Route, am Zufallsort und in der Karte.
-5. Nach dem Check-in in der TerraMine-App tippst du hier **✅ Check-in gemacht** — der Owner
-   verschwindet für 24 Stunden aus den Vorschlägen und du siehst, wann er wieder frei wird.
-6. Darunter steht die **Laufroute** durch die übrigen Owner (Nearest-Neighbour, mit Gesamtstrecke) —
-   praktisch für den Streak-Bonus (3 / 5 / 10 verschiedene Owner am Tag = +10 / +25 / +50 TB).
+1. **Set a location** (GPS, type coordinates — or 🎲 roll one).
+2. It loads every TerraAcre in range live from the public TerraMine endpoints — the same ones the
+   official world map (`terramine.app/heatmap.html`) uses.
+3. Connected blocks of tiles are grouped into **owner groups**.
+4. You get **one target per owner** with the exact tile centre to five decimals, distance, compass
+   direction and a navigation link. **One tap on the coordinates copies them** to the clipboard
+   (with visible and tactile feedback); the same copy button sits in every route row, on the random
+   spot and in the map popup.
+5. After checking in inside the TerraMine app, tap **✅ Checked in** here — that owner disappears
+   from the suggestions for 24 hours and you see when they come back.
+6. Below that is the **walking route** through the remaining owners (nearest-neighbour, with total
+   distance) — handy for the streak bonus (3 / 5 / 10 different owners a day = +10 / +25 / +50 TB).
 
-## Auf GitHub Pages veröffentlichen
+## Publish on GitHub Pages
 
-**Variante A — ohne Actions (am einfachsten)**
+**Option A — no Actions (simplest)**
 
 1. Repository → **Settings** → **Pages**
 2. *Source*: **Deploy from a branch**
-3. *Branch*: `claude/terramine-mine-tracker-mdxdex` (oder `main`, nachdem du gemergt hast), Ordner **`/ (root)`** → **Save**
-4. Nach ein bis zwei Minuten liegt die Seite unter `https://<dein-name>.github.io/terramine/`
+3. *Branch*: `claude/terramine-mine-tracker-mdxdex` (or `main` once merged), folder **`/ (root)`** → **Save**
+4. A minute or two later the site is live at `https://<your-name>.github.io/terramine/`
 
-**Variante B — mit Actions**
+**Option B — with Actions**
 
-*Source* auf **GitHub Actions** stellen. Der Workflow `.github/workflows/pages.yml` veröffentlicht
-dann bei jedem Push auf `main` oder `claude/terramine-mine-tracker-mdxdex` (und manuell über *Run workflow*).
+Set *Source* to **GitHub Actions**. The workflow `.github/workflows/pages.yml` then publishes on
+every push to `main` or `claude/terramine-mine-tracker-mdxdex` (and manually via *Run workflow*).
 
-**Fürs Handy gebaut**: Ein-Spalten-Layout, alle Bedienelemente mindestens 40–48 px hoch,
-kein seitliches Scrollen bis hinunter zu 360 px Displaybreite, Bedienung unten am Daumen,
-Ziel direkt über der Falz. Der gewürfelte Ort und alle Daten überleben den Wechsel in die
-TerraMine-App und zurück.
+**Built for phones**: single-column layout, every control at least 40–48 px tall, no sideways
+scrolling down to a 360 px screen, controls within thumb reach, target right above the fold. The
+rolled spot and all data survive switching to the TerraMine app and back.
 
-**Auf dem Handy**: Seite öffnen → *Zum Startbildschirm hinzufügen*. Die App-Hülle wird per Service
-Worker gecacht und startet auch bei schlechtem Empfang; die Minen-Daten kommen weiter live aus dem Netz.
-GPS funktioniert nur über HTTPS — die Pages-URL erfüllt das.
+**On your phone**: open the page → *Add to home screen*. The app shell is cached by a service
+worker and starts even on a weak connection; mine data still comes live from the network. GPS only
+works over HTTPS — the Pages URL covers that.
 
-## Bedienung
+## Language
 
-| Element | Bedeutung |
+The interface ships in **English** and switches to **German** with the `DE` button in the header
+(or under *More → Language*). The choice is remembered, and it also changes number formats,
+compass points and dates.
+
+## Usage
+
+| Screen | what you get |
 |---|---|
-| **Radar** | Modus-Umschalter 📍/🎲, nächstes Ziel, Laufroute, Cooldown-Übersicht, Tages-Streak |
-| **Karte** | Alle Minen im Umkreis: grün = frei, grau = Cooldown, rot = gesperrt, gelb = aktuelles Ziel |
-| **Owner** | Alle erfassten Owner mit Restzeit; umbenennen, zusammenführen, Cooldown aufheben |
-| **Mehr** | Radius, Cooldown-Dauer, Blockabstand, Typfilter, Verlauf, Export/Import |
+| **Radar** | mode switch 📍/🎲, next target, walking route, cooldown overview, daily streak |
+| **Map** | every mine in range: green = free, grey = cooldown, red = blocked, yellow = current target |
+| **Owners** | all recorded owners with remaining time; rename, merge, clear cooldown |
+| **More** | language, radius, cooldown length, block spacing, type filters, history, export/import |
 
-- **Koordinaten antippen** kopiert sie in die Zwischenablage — Format `52.52000, 13.40500`.
-- **⏭ Später** blendet eine Gruppe für 3 Stunden aus (z. B. gerade nicht auf dem Weg).
-- **🚫 Nicht erreichbar** sperrt eine einzelne Mine dauerhaft oder befristet (Privatgelände, Gebäude, Wasser).
-- **↺ oben rechts** macht die letzte Aktion rückgängig; einzelne Check-ins lassen sich im Verlauf (Tab *Mehr*) auch später noch löschen.
+- **Tap the coordinates** to copy them — format `52.52000, 13.40500`.
+- **⏭ Later** hides a group for 3 hours (not on your way right now).
+- **🚫 Can’t reach** blocks a single mine permanently or temporarily (private property, building, water).
+- **↺ in the header** undoes the last action; individual check-ins can also be deleted later in the
+  history (tab *More*).
 
-## Owner-Erkennung — wie zuverlässig ist das?
+## How reliable is the owner detection?
 
-Die öffentliche API gibt **keine Owner-IDs** heraus, nur Koordinate und Minentyp. Deshalb:
+The public API exposes **no owner IDs**, only coordinate and mine type. So:
 
-- **Schätzung:** ein zusammenhängender Block von Feldern (Standard: höchstens 25 m Abstand) gilt als
-  *ein* Owner. Spieler bauen ihre TerraAcres praktisch immer als Block um Zuhause, Arbeit oder Schule.
-- **Deine Bestätigung schlägt die Schätzung:** trägst du beim Abhaken den Ownernamen aus dem Spiel ein,
-  merkt sich der Radar den Namen für den ganzen Block. Taucht derselbe Name an einer anderen Stelle
-  wieder auf, teilen sich beide Blöcke einen Cooldown.
-- **Dichte Innenstadtblöcke** können mehreren Ownern gehören. Setz beim Check-in den Haken
-  *„Dieser Block gehört mehreren Ownern"* — dann sperrt ein Check-in nur die 30 m rundherum
-  statt des ganzen Blocks.
-- **Blockabstand** (Tab *Mehr*) steuert, wie großzügig zusammengefasst wird: kleiner = mehr, feinere
-  Gruppen; größer = weniger, gröbere Gruppen.
+- **Estimate:** a connected block of tiles (default: at most 25 m apart) counts as *one* owner.
+  Players build their TerraAcres as a block around home, work or school almost every time.
+- **Your confirmation beats the estimate:** if you enter the in-game owner name when ticking a
+  target off, the radar remembers the name for the whole block. If the same name shows up somewhere
+  else, both blocks share one cooldown.
+- **Dense city blocks** can belong to several owners. Tick *“This block belongs to several owners”*
+  on the check-in — a check-in then only blocks the 30 m around it instead of the whole block.
+- **Block spacing** (tab *More*) controls how generously tiles are merged: smaller = more, finer
+  groups; larger = fewer, coarser groups.
 
-Der Check-in selbst passiert weiter in der TerraMine-App vor Ort (das Spiel prüft die GPS-Nähe).
-Dieses Tool plant die Runde und führt Buch.
+The check-in itself still happens in the TerraMine app on site (the game verifies GPS proximity).
+This tool plans the round and keeps the books.
 
-## Daten und Privatsphäre
+## Data and privacy
 
-Alles — Owner, Cooldowns, Check-ins, Einstellungen — liegt ausschließlich im `localStorage` deines
-Browsers. Nichts wird hochgeladen, es gibt keinen Account und kein Tracking. Vor einem Gerätewechsel
-oder dem Leeren des Browser-Speichers: *Mehr → Daten → Export*, auf dem neuen Gerät importieren
-(wahlweise zusammenführen oder ersetzen).
+Everything — owners, cooldowns, check-ins, settings — lives solely in your browser’s
+`localStorage`. Nothing is uploaded, there is no account and no tracking. Before switching devices
+or clearing browser storage: *More → Data → Export*, then import on the new device (merge or
+replace, your choice).
 
-Abgefragt werden nur diese beiden öffentlichen Endpunkte, immer nur für deinen Umkreis:
+Only these two public endpoints are queried, and only for your surroundings:
 
 ```
-GET .../getPropertiesInViewport?minLat=&maxLat=&minLng=&maxLng=   → Minen im Ausschnitt
-GET .../getHeatmapData                                            → weltweite Gegenden-Übersicht (nur im Weltmodus)
+GET .../getPropertiesInViewport?minLat=&maxLat=&minLng=&maxLng=   → mines in that box
+GET .../getHeatmapData                                            → worldwide area overview (world mode only)
 ```
 
-Die Weltübersicht (ca. 3,6 MB) wird erst geladen, wenn du sie anforderst, dann 24 Stunden lokal
-gespeichert — der zweite Wurf braucht kein Netz mehr für die Ortsauswahl.
+The world overview (approx. 3.6 MB) is only downloaded once you ask for it, then kept locally for
+24 hours — the second roll needs no network for picking a spot.
 
-## Entwicklung
+## Development
 
 ```bash
-npm test          # 51 Tests der Kernlogik (Cluster, Cooldowns, Route, Zufallsorte, Import/Export)
-npm start         # lokaler Server auf http://localhost:8080
-node tests/e2e.js # Browsertest mit Playwright: echte Daten, Check-in, Karte, Persistenz
+npm test          # 59 unit tests (clustering, cooldowns, route, random spots, i18n, import/export)
+npm start         # local server on http://localhost:8080
+node tests/e2e.js # browser test with Playwright: real data, check-in, world mode, clipboard, languages
 ```
 
-| Datei | Inhalt |
+| File | contents |
 |---|---|
-| `assets/js/util.js` | Geo-Mathematik, Formate, IDs |
-| `assets/js/cluster.js` | Blockbildung (Union-Find über ein Meter-Raster) |
-| `assets/js/world.js` | Zufallsorte: Zellen filtern, ziehen, Suchfenster berechnen |
-| `assets/js/store.js` | Owner, Cooldowns, Zielauswahl, Route, Import/Export |
-| `assets/js/api.js` | TerraMine-Endpunkte inkl. Offline-Cache |
-| `assets/js/app.js` | Oberfläche |
-| `tests/run.js` | Unit-Tests (`node --test`) |
-| `tests/e2e.js` | Browsertest (Playwright, optional) |
+| `assets/js/i18n.js` | English + German strings, `t()`, DOM translation |
+| `assets/js/util.js` | geo maths, formats, IDs |
+| `assets/js/cluster.js` | block detection (union-find over a metre grid) |
+| `assets/js/world.js` | random spots: filter cells, draw one, compute the search box |
+| `assets/js/store.js` | owners, cooldowns, target selection, route, import/export |
+| `assets/js/api.js` | TerraMine endpoints incl. offline cache |
+| `assets/js/app.js` | interface |
+| `tests/run.js` | unit tests (`node --test`) |
+| `tests/e2e.js` | browser test (Playwright, optional) |
 
-## Rechtliches
+## Legal
 
-Inoffizielles Hilfsmittel, nicht mit TerraMine verbunden. Es nutzt ausschließlich öffentlich
-abrufbare Endpunkte, ändert nichts im Spiel und automatisiert keine Spielaktionen — Check-ins
-machst weiterhin du selbst in der App. Kartendarstellung: © OpenStreetMap-Mitwirkende.
+Unofficial helper, not affiliated with TerraMine. It only uses publicly available endpoints, changes
+nothing in the game and automates no game actions — you still check in yourself in the app.
+Map tiles: © OpenStreetMap contributors.
 
-MIT-Lizenz.
+MIT licence.

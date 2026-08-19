@@ -59,11 +59,11 @@ function check(name, ok, detail) {
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 
   await page.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
-  check('Seite laedt', await page.title() === 'Owner Radar — TerraMine Check-in Tracker');
+  check('Seite laedt auf Englisch', await page.title() === 'Owner Radar — TerraMine check-in tracker');
 
   // GPS -> Minen laden
   await page.click('#btn-locate');
-  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 Minen', { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 mines', { timeout: 30000 });
   const minesText = await page.textContent('#chip-mines');
   const groupsText = await page.textContent('#chip-groups');
   check('Minen von der Live-API geladen', /[1-9]/.test(minesText), minesText);
@@ -75,7 +75,7 @@ function check(name, ok, detail) {
   const listLen1 = await page.$$eval('#target-list li', n => n.length);
   check('Weitere Ziele werden gelistet', listLen1 > 1, 'Eintraege: ' + listLen1);
   const routeInfo = await page.textContent('#next-count');
-  check('Laufroute mit Gesamtstrecke', /Owner · .* Runde/.test(routeInfo), routeInfo);
+  check('Laufroute mit Gesamtstrecke', /owners · .* round/.test(routeInfo), routeInfo);
   check('Reihenfolge-Umschalter zeigt den Modus', (await page.textContent('#btn-order')) === 'Route');
   await page.screenshot({ path: path.join(OUT, '01-radar.png'), fullPage: true });
 
@@ -117,7 +117,7 @@ function check(name, ok, detail) {
 
   // Persistenz ueber einen Neustart
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 Minen', { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 mines', { timeout: 30000 });
   const cooldown2 = await page.textContent('#cooldown-list');
   check('Cooldown ueberlebt den Neuladen', cooldown2.includes('Anna'), cooldown2.trim().slice(0, 80));
   const coords3 = await page.textContent('.target-coords b');
@@ -148,7 +148,7 @@ function check(name, ok, detail) {
   await page.waitForTimeout(300);
   const clip = (await page.evaluate(() => navigator.clipboard.readText())).trim();
   check('Ein Tipp kopiert die Koordinaten', clip === shownCoords, `Zwischenablage: "${clip}" / angezeigt: "${shownCoords}"`);
-  check('Kopieren wird sichtbar bestaetigt', (await page.textContent('.target-coords .copy-hint')).includes('kopiert'));
+  check('Kopieren wird sichtbar bestaetigt', (await page.textContent('.target-coords .copy-hint')).includes('copied'));
 
   // Weltweit-Modus mit einem kleinen, stabilen Weltdatensatz
   const WORLD = {
@@ -168,7 +168,7 @@ function check(name, ok, detail) {
 
   await page.click('#btn-dice');
   await page.waitForSelector('#dl-start', { timeout: 10000 });
-  check('Weltdaten werden vor dem Laden angekuendigt', (await page.textContent('#sheet-body')).includes('3,6 MB'));
+  check('Weltdaten werden vor dem Laden angekuendigt', (await page.textContent('#sheet-body')).includes('3.6 MB'));
   await page.click('#dl-start');
   await page.waitForSelector('#sheet-backdrop', { state: 'hidden', timeout: 20000 });
   await page.waitForSelector('#world-info:not([hidden])', { timeout: 20000 });
@@ -194,16 +194,38 @@ function check(name, ok, detail) {
   await page.unroute('**/getHeatmapData*');
   await page.click('#mode-switch .seg[data-mode="near"]');
   await page.waitForSelector('#card-near:not([hidden])');
-  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 Minen', { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent !== '⛏ 0 mines', { timeout: 30000 });
 
   // Leerer Umkreis: verstaendliche Meldung statt Blindflug (API-Antwort simuliert)
   await page.route('**/getPropertiesInViewport*', r =>
     r.fulfill({ status: 200, contentType: 'application/json', body: '{"properties":[],"truncated":false}' }));
   await page.click('#btn-refresh');
-  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent === '⛏ 0 Minen', { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('#chip-mines').textContent === '⛏ 0 mines', { timeout: 15000 });
   const emptyText = await page.textContent('#target-slot');
-  check('leerer Umkreis wird erklaert', /Keine Minen in der Naehe/.test(emptyText), emptyText.replace(/\s+/g, ' ').slice(0, 90));
+  check('leerer Umkreis wird erklaert', /No mines nearby/.test(emptyText), emptyText.replace(/\s+/g, ' ').slice(0, 90));
   await page.unroute('**/getPropertiesInViewport*');
+
+  // Sprache umschalten
+  const enTabs = await page.textContent('.tabbar');
+  check('Oberflaeche startet auf Englisch', enTabs.includes('Owners') && enTabs.includes('More'), enTabs.replace(/\s+/g, ' '));
+  await page.click('#btn-lang');
+  await page.waitForTimeout(400);
+  const deTabs = await page.textContent('.tabbar');
+  check('Umschalten auf Deutsch aendert die Oberflaeche', deTabs.includes('Owner') && deTabs.includes('Mehr'), deTabs.replace(/\s+/g, ' '));
+  check('Kopfzeile bietet danach Englisch an', (await page.textContent('#btn-lang')) === 'EN');
+  const deChip = await page.textContent('#chip-mines');
+  check('auch dynamische Texte wechseln', /Minen/.test(deChip), deChip);
+  const deMode = await page.textContent('#mode-switch');
+  check('Modusumschalter ist uebersetzt', deMode.includes('Umkreis') && deMode.includes('Weltweit'), deMode.replace(/\s+/g, ' '));
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(800);
+  check('Sprachwahl ueberlebt den Neustart', (await page.textContent('.tabbar')).includes('Mehr'));
+
+  // zurueck auf Englisch (Hauptsprache)
+  await page.click('#btn-lang');
+  await page.waitForTimeout(300);
+  check('Zurueckschalten auf Englisch klappt', (await page.textContent('.tabbar')).includes('More'));
 
   check('keine JS-Fehler', errors.length === 0, errors.join(' | '));
 
